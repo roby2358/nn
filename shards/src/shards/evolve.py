@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import CROSSOVER_GENE_ODDS, CROSSOVER_RATE, ELITES, MUTATION_SIGMAS, POP_SIZE, SCENARIOS_PER_GEN
+from .config import CROSSOVER_GENE_ODDS, CROSSOVER_RATE, ELITES, MUTATION_SIGMAS, POP_SIZE, RUN_STEPS, SCENARIOS_PER_GEN
 from .pilots import Brains, Pilot, random_genomes
 from .scenario import Scenario, make_scenario
 from .worlds import Worlds
@@ -56,7 +56,7 @@ def fly(worlds: Worlds, pilot: Pilot) -> Worlds:
 def evaluate(genomes: np.ndarray, scenarios: list[Scenario], gen: int) -> tuple[np.ndarray, GenStats]:
     """Worlds [s*P, (s+1)*P) are the population on scenario s."""
     p, s = len(genomes), len(scenarios)
-    worlds = fly(Worlds(scenarios, np.repeat(np.arange(s), p)), Brains(np.tile(genomes, (s, 1))))
+    worlds = fly(Worlds(scenarios, np.repeat(np.arange(s), p), RUN_STEPS), Brains(np.tile(genomes, (s, 1))))
 
     def per_net(values: np.ndarray) -> np.ndarray:
         return values.reshape(s, p).mean(0)

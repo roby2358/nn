@@ -13,7 +13,7 @@ import numpy as np
 
 from .config import (BIG, CMD_FIRE, CMD_THRUST, CMD_TURN, COOLDOWN, DRAG, DRIFT_TABLE, DT, FIELD, FIRE_ABOVE, GUN_READY,
                      MAX_SPEED, NEAREST, POINTS, RADIUS, RADIUS_SCALE, ROCK_CLOSE, ROCK_COS, ROCK_INPUTS, ROCK_RADIUS,
-                     ROCK_SIN, ROCK_SLOTS, ROCK_V_FORWARD, ROCK_V_SIDEWAYS, RUN_STEPS, SELF_INPUTS, SENSE_RANGE, SHIP_R,
+                     ROCK_SIN, ROCK_SLOTS, ROCK_V_FORWARD, ROCK_V_SIDEWAYS, SELF_INPUTS, SENSE_RANGE, SHIP_R,
                      SHOT_COST, SHOT_LIFE, SHOT_SLOTS, SHOT_SPEED, SPAWN_CLEAR, SPEED_HI, SPEED_LO, SPEED_SCALE,
                      SURVIVAL_POINTS, THRUST, TURN_RATE, V_FORWARD, V_SIDEWAYS, WAVE_BASE, WAVE_MAX, WAVE_TABLE)
 from .scenario import Scenario
@@ -43,8 +43,9 @@ class Event:
 
 
 class Worlds:
-    def __init__(self, scenarios: list[Scenario], scenario_of: np.ndarray) -> None:
+    def __init__(self, scenarios: list[Scenario], scenario_of: np.ndarray, step_limit: float) -> None:
         k = len(scenario_of)
+        self.step_limit = step_limit
         self.scenario_of = scenario_of
         self.spots = np.stack([s.spots for s in scenarios])     # (S, WAVE_TABLE, WAVE_MAX, 2)
         self.drifts = np.stack([s.drifts for s in scenarios])   # (S, DRIFT_TABLE, 2)
@@ -77,7 +78,7 @@ class Worlds:
 
     @property
     def done(self) -> bool:
-        return self.steps >= RUN_STEPS or not self.alive.any()
+        return self.steps >= self.step_limit or not self.alive.any()
 
     def fitness(self) -> np.ndarray:
         return self.score + SURVIVAL_POINTS * self.survived - SHOT_COST * self.fired

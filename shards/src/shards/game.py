@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import signal
 import time
 from collections.abc import Callable
@@ -11,7 +12,7 @@ import numpy as np
 import pygame
 
 from . import art
-from .config import DT, FIELD_H, FIELD_W, GENS_PER_PRESS, RUN_SECONDS
+from .config import DT, FIELD_H, FIELD_W, FREE_PLAY_STEPS, GENS_PER_PRESS, RUN_STEPS
 from .evolve import SWARM, WEIGHTS, BackgroundEvolver, Evolver
 from .pilots import HumanPilot, Pilot
 from .scenario import make_scenario
@@ -61,10 +62,10 @@ class Button:
 class Round:
     """One pilot flying one scenario, with the debris it makes."""
 
-    def __init__(self, label: str, pilot: Pilot, seed: int, rng: np.random.Generator) -> None:
+    def __init__(self, label: str, pilot: Pilot, seed: int, rng: np.random.Generator, step_limit: float) -> None:
         self.label = label
         self.pilot = pilot
-        self.world = Worlds([make_scenario(seed)], np.zeros(1, dtype=np.int64))
+        self.world = Worlds([make_scenario(seed)], np.zeros(1, dtype=np.int64), step_limit)
         self.shards = art.Shards(rng)
         self.hold = END_HOLD_FRAMES
 
@@ -92,7 +93,8 @@ class Round:
         art.draw_shots(surf, w)
         art.draw_player(surf, w, t)
         self.shards.draw(glow)
-        hud = f"{self.label}   score {w.score[0]:.0f}   wave {w.wave[0] + 1}   {RUN_SECONDS - w.steps * DT:4.1f}s"
+        clock = "" if math.isinf(w.step_limit) else f"   {(w.step_limit - w.steps) * DT:4.1f}s"
+        hud = f"{self.label}   score {w.score[0]:.0f}   wave {w.wave[0] + 1}{clock}"
         surf.blit(fonts.mono.render(hud, True, art.TEXT), (10, 8))
 
 
@@ -105,10 +107,11 @@ class Mode:
 
 
 FLY = Mode("Watch", "Left/right turn, up thrusts, space fires, R restarts.",
-           lambda app, seed: Round("you", app.human, seed, app.rng),
+           lambda app, seed: Round("you", app.human, seed, app.rng, FREE_PLAY_STEPS),
            lambda app: 1)
 WATCH = Mode("Fly", "Watching the champion.",
-             lambda app, seed: Round(f"champion, gen {app.evolver.gen}", app.evolver.champion(), seed, app.rng),
+             lambda app, seed: Round(f"champion, gen {app.evolver.gen}", app.evolver.champion(), seed, app.rng,
+                                     RUN_STEPS),
              lambda app: SPEEDS[app.speed])
 
 

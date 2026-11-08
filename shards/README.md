@@ -20,7 +20,7 @@ Shots add the ship's velocity, last about a second, and only four can be in the 
 
 A shot breaks a big rock into two medium ones, a medium into two small, and a small rock is gone. Smaller rocks drift
 faster and score more: 1, 2 and 3 points for big, medium and small. Clearing the field brings a new wave with one more
-big rock, up to twelve, appearing anywhere at least 170 px from the ship. Touching a rock ends the round, and a round lasts at most 45 s.
+big rock, up to twelve, appearing anywhere at least 170 px from the ship. Touching a rock ends the round. A round you fly yourself has no time limit; in training and Watch it lasts at most 30 s.
 
 ## The pilot
 

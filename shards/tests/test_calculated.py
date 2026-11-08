@@ -4,7 +4,8 @@ import numpy as np
 
 from shards.calculated import hunter
 from shards.config import (CMD_FIRE, CMD_THRUST, CMD_TURN, N_INPUTS, ROCK_CLOSE, ROCK_COS, ROCK_RADIUS, ROCK_SIN,
-                           ROCK_V_FORWARD, ROCK_V_SIDEWAYS, SHOT_SPEED, SPEED_SCALE, V_FORWARD, rock_input)
+                           ROCK_V_FORWARD, ROCK_V_SIDEWAYS, RUN_SECONDS, RUN_STEPS, SHOT_SPEED, SPEED_SCALE, V_FORWARD,
+                           rock_input)
 from shards.evolve import fly
 from shards.pilots import GENOME, Brains
 from shards.scenario import make_scenario
@@ -86,6 +87,6 @@ def test_it_turns_away_from_a_close_rock_abeam():
 
 def test_it_plays_a_real_round():
     scenarios = [make_scenario(s) for s in range(8)]
-    w = fly(Worlds(scenarios, np.arange(8)), Brains(np.tile(hunter().genomes, (8, 1))))
+    w = fly(Worlds(scenarios, np.arange(8), RUN_STEPS), Brains(np.tile(hunter().genomes, (8, 1))))
     assert w.hits.sum() / w.fired.sum() > 0.45
-    assert w.survived.mean() > 40.0
+    assert w.survived.mean() > 0.85 * RUN_SECONDS

@@ -4,7 +4,7 @@ import numpy as np
 
 from shards.config import (BIG, CMD_FIRE, CMD_THRUST, CMD_TURN, COOLDOWN, DT, FIELD, FIELD_W, MAX_SPEED, N_INPUTS,
                            N_OUTPUTS, POINTS, ROCK_COS, ROCK_SIN, ROCK_SLOTS, RUN_STEPS, SHIP_R, SHOT_COST, SHOT_LIFE,
-                           SHOT_SLOTS, SPAWN_CLEAR, SURVIVAL_POINTS, WAVE_BASE, rock_input)
+                           SHOT_SLOTS, SPAWN_CLEAR, SURVIVAL_POINTS, WAVE_BASE, WAVE_MAX, FREE_PLAY_STEPS, rock_input)
 from shards.scenario import make_scenario
 from shards.worlds import Worlds, shortest
 
@@ -25,7 +25,7 @@ NEAREST_COS = rock_input(0, ROCK_COS)
 
 
 def world_of_one() -> Worlds:
-    return Worlds([make_scenario(1)], np.zeros(1, dtype=np.int64))
+    return Worlds([make_scenario(1)], np.zeros(1, dtype=np.int64), RUN_STEPS)
 
 
 def empty_but_one_rock(w: Worlds, pos: tuple, size: int) -> None:
@@ -42,7 +42,7 @@ def aim_at_right(w: Worlds) -> None:
 
 def test_first_wave_keeps_clear_of_the_ship():
     for seed in range(50):
-        w = Worlds([make_scenario(seed)], np.zeros(1, dtype=np.int64))
+        w = Worlds([make_scenario(seed)], np.zeros(1, dtype=np.int64), RUN_STEPS)
         assert (w.rock_size[0] == BIG).sum() == WAVE_BASE
         live = w.rock_size[0] > 0
         assert np.hypot(*shortest(w.rock_pos[0][live] - w.pos[0]).T).min() >= SPAWN_CLEAR
@@ -153,8 +153,8 @@ def test_clearing_the_last_rock_starts_a_bigger_wave():
 def test_a_single_wave_always_fits_its_slots():
     w = world_of_one()
     w.rock_size[:] = 0
-    w.rock_size[0, :8] = BIG
-    for _ in range(3 * 8):
+    w.rock_size[0, :WAVE_MAX] = BIG
+    for _ in range(3 * WAVE_MAX):
         rock = int(np.argmax(w.rock_size[0] > 1))
         w.shot_ttl[0, 0] = 1.0
         w._strike(0, 0, rock)
@@ -184,6 +184,14 @@ def test_collisions_reach_across_the_wrap():
     w.pos[0] = (2.0, 300.0)
     w.step(IDLE)
     assert not w.alive[0]
+
+
+def test_free_play_has_no_time_limit():
+    w = Worlds([make_scenario(1)], np.zeros(1, dtype=np.int64), FREE_PLAY_STEPS)
+    empty_but_one_rock(w, tuple(w.pos[0] + FIELD / 4), 1)
+    for _ in range(RUN_STEPS + 5):
+        w.step(IDLE)
+    assert w.steps == RUN_STEPS + 5 and not w.done
 
 
 def test_round_ends_on_time_and_survival_counts():

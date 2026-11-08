@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import CMD_FIRE, CMD_THRUST, CMD_TURN, FIRE_ABOVE
+from .config import CMD_FIRE, CMD_THRUST, CMD_TURN, FIRE_ABOVE, RUN_STEPS
 from .evolve import accuracy, fly
 from .pilots import Brains
 from .scenario import make_scenario
@@ -30,7 +30,7 @@ def main() -> None:
     path, n = Path(sys.argv[1]), int(sys.argv[2])
     scenarios = [make_scenario(s) for s in range(n)]
     pilot = Brains.load(path)
-    worlds = Worlds(scenarios, np.arange(n))
+    worlds = Worlds(scenarios, np.arange(n), RUN_STEPS)
     recorder = Recorder(Brains(np.tile(pilot.genomes, (n, 1))), worlds)
     w = fly(worlds, recorder)
     commands = np.concatenate(recorder.commands)

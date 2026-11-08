@@ -11,7 +11,7 @@ import imageio_ffmpeg  # noqa: E402
 import numpy as np  # noqa: E402
 import pygame  # noqa: E402
 
-from .config import DT  # noqa: E402
+from .config import DT, RUN_STEPS  # noqa: E402
 from .game import FIELD, App, Round  # noqa: E402
 from .pilots import Brains  # noqa: E402
 
@@ -36,7 +36,7 @@ def record(app: App, frames: int, out: Path) -> None:
 def main() -> None:
     weights, seed, seconds, out = Path(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]), Path(sys.argv[4])
     app = App()
-    app.scene = Round(weights.stem, Brains.load(weights), seed, np.random.default_rng(seed))
+    app.scene = Round(weights.stem, Brains.load(weights), seed, np.random.default_rng(seed), RUN_STEPS)
     record(app, round(seconds * FPS), out)
     app.bg.shutdown()
     w = app.scene.world

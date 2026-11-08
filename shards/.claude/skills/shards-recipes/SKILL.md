@@ -13,4 +13,6 @@ description: Project helper recipes for shards (cc- prefixed justfile recipes). 
 - `just cc-shot <seconds>`: runs the App headless and saves `shot-watch.png` (the champion, that many seconds in)
   and `shot-fly.png` (a held burn with the trigger down, to see the flame). Read the PNGs to check visuals. They are
   gitignored.
+- `just cc-calculated <out.npz>`: builds the hand-made turret pilot with no training and writes it to that file,
+  replacing anything already there. Measure it with `cc-stats`.
 - In a new container, pass an existing venv: `VENV=.venv-<host> just cc-stats ...`.

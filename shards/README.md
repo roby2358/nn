@@ -37,6 +37,17 @@ big rock, up to eight. Touching a rock ends the round, and a round lasts at most
 
 All tuning numbers are in `src/shards/config.py`.
 
+## The calculated pilot
+
+`just cc-calculated <out.npz>` builds a pilot with no training and writes it as an ordinary genome, the same 747
+weights in the same 27 -> 24 -> 3 net. It only uses five hidden units; the other nineteen are zeros.
+
+It's a turret: it never thrusts, turns toward the nearest rock and fires only when the shot would land. Leading the
+target needs no extra machinery. For a rock with sideways relative speed v, the intercepting shot leaves at
+sin(aim) = v / shot speed at any distance, so the aiming error is a weighted sum of two inputs. One hidden unit carries
+that error to the turn output. The other four are sharp tanh units that act as an AND gate on the fire output: error
+inside a tolerance on either side, rock ahead, rock in range.
+
 ## Running
 
 The project dir is shared between container and host, so each side gets its own venv at `.venv-<hostname>/` (gitignored).
@@ -48,6 +59,7 @@ just up           # launch the GUI, needs a display
 just evolve 300   # evolve headless, resumes from and saves swarm.npz + weights.npz
 just cc-stats weights.npz 100   # how a weights file plays on 100 fixed fields
 just cc-shot 6    # headless screenshots shot-watch.png / shot-fly.png, 6 s in
+just cc-calculated weights.npz   # build the turret pilot without training
 ```
 
 Requires `uv` and `just`.

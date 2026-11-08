@@ -43,3 +43,7 @@ cc-stats weights n:
 # Save a headless screenshot of the champion, N seconds into a round
 cc-shot seconds:
     {{python}} -m shards.shot {{seconds}}
+
+# Build the hand-made turret pilot, without training, into the given weights file
+cc-calculated out:
+    {{python}} -m shards.calculated {{out}}

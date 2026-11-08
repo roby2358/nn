@@ -41,7 +41,6 @@ WAVE_MAX = 8
 ROCK_SLOTS = WAVE_MAX * 4  # a big rock is at most four small rocks at once
 WAVE_TABLE = 16           # distinct waves stored per scenario, then they repeat
 DRIFT_TABLE = 256         # stored rock drifts per scenario, then they repeat
-LEFT_EDGE_ODDS = 0.5      # a rock enters on the left edge this often, otherwise on the top edge
 SPAWN_CLEAR = 170.0       # a new rock this close to the ship moves to the far side of the field
 
 # ---- scoring ----------------------------------------------------------------------

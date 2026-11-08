@@ -20,7 +20,7 @@ Shots add the ship's velocity, last about a second, and only four can be in the 
 
 A shot breaks a big rock into two medium ones, a medium into two small, and a small rock is gone. Smaller rocks drift
 faster and score more: 1, 2 and 3 points for big, medium and small. Clearing the field brings a new wave with one more
-big rock, up to eight. Touching a rock ends the round, and a round lasts at most 45 s.
+big rock, up to eight, appearing anywhere at least 170 px from the ship. Touching a rock ends the round, and a round lasts at most 45 s.
 
 ## The pilot
 
@@ -60,6 +60,7 @@ just evolve 300   # evolve headless, resumes from and saves swarm.npz + weights.
 just cc-stats weights.npz 100   # how a weights file plays on 100 fixed fields
 just cc-shot 6    # headless screenshots shot-watch.png / shot-fly.png, 6 s in
 just cc-calculated weights.npz   # build the turret pilot without training
+just cc-video weights-opus.npz 0 30 shards-turret.mp4   # record 30 s of the playing field
 ```
 
 Requires `uv` and `just`.

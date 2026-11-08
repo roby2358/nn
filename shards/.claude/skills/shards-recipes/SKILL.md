@@ -15,4 +15,6 @@ description: Project helper recipes for shards (cc- prefixed justfile recipes). 
   gitignored.
 - `just cc-calculated <out.npz>`: builds the hand-made turret pilot with no training and writes it to that file,
   replacing anything already there. Measure it with `cc-stats`.
+- `just cc-video <weights.npz> <seed> <seconds> <out.mp4>`: records that pilot on one field at real speed, playing
+  field only, with the weights file's name in the HUD.
 - In a new container, pass an existing venv: `VENV=.venv-<host> just cc-stats ...`.

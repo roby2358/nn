@@ -222,6 +222,15 @@ class App:
 
     def compose(self, t: float) -> None:
         """Paint the whole window for animation time t, without presenting it."""
+        self.compose_field(t)
+        self.screen.fill(art.PANEL_BG)
+        self.screen.blit(self.field, (0, 0))
+        self.draw_panel()
+        msg = self.fonts.small.render(self.message, True, art.TEXT)
+        self.screen.blit(msg, (GAP, FIELD[1] + (STATUS_H - msg.get_height()) // 2))
+
+    def compose_field(self, t: float) -> None:
+        """Paint the playing field alone for animation time t."""
         self.stars.draw(self.field)
         self.glow.fill((0, 0, 0, 0))
         self.scene.draw(self.field, self.glow, t, self.fonts)
@@ -229,11 +238,6 @@ class App:
         if self.steps_per_frame() > 1:
             s = self.fonts.mono.render(f"x{self.steps_per_frame()}", True, art.MUTED)
             self.field.blit(s, (FIELD[0] - s.get_width() - 10, 8))
-        self.screen.fill(art.PANEL_BG)
-        self.screen.blit(self.field, (0, 0))
-        self.draw_panel()
-        msg = self.fonts.small.render(self.message, True, art.TEXT)
-        self.screen.blit(msg, (GAP, FIELD[1] + (STATUS_H - msg.get_height()) // 2))
 
     def draw_panel(self) -> None:
         self.buttons["Fly"].label = self.mode.button

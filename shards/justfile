@@ -47,3 +47,7 @@ cc-shot seconds:
 # Build the hand-made turret pilot, without training, into the given weights file
 cc-calculated out:
     {{python}} -m shards.calculated {{out}}
+
+# Record a weights file flying one field to an MP4, playing field only
+cc-video weights seed seconds out:
+    {{python}} -m shards.video {{weights}} {{seed}} {{seconds}} {{out}}

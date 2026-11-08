@@ -232,3 +232,9 @@ def test_each_shot_costs_fitness():
     w.step(FIRE)
     assert w.fired[0] == 1
     assert np.isclose(w.fitness()[0], SURVIVAL_POINTS * w.survived[0] - SHOT_COST)
+
+
+def test_waves_can_appear_away_from_the_edges():
+    spots = np.concatenate([make_scenario(seed).spots.reshape(-1, 2) for seed in range(10)])
+    margin = np.minimum(spots, FIELD - spots).min(1)
+    assert (margin > FIELD_W / 4).mean() > 0.1

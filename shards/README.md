@@ -40,13 +40,19 @@ All tuning numbers are in `src/shards/config.py`.
 ## The calculated pilot
 
 `just cc-calculated <out.npz>` builds a pilot with no training and writes it as an ordinary genome, the same 747
-weights in the same 27 -> 24 -> 3 net. It only uses five hidden units; the other nineteen are zeros.
+weights in the same 27 -> 24 -> 3 net. It uses twenty-two hidden units; the other two are zeros.
 
-It's a turret: it never thrusts, turns toward the nearest rock and fires only when the shot would land. Leading the
-target needs no extra machinery. For a rock with sideways relative speed v, the intercepting shot leaves at
-sin(aim) = v / shot speed at any distance, so the aiming error is a weighted sum of two inputs. One hidden unit carries
-that error to the turn output. The other four are sharp tanh units that act as an AND gate on the fire output: error
-inside a tolerance on either side, rock ahead, rock in range.
+It's a hunter: it turns toward the nearest rock, whichever that is at the moment, fires only when the shot would land,
+and moves by reading a danger field. Leading the target needs no extra machinery. For a rock with sideways relative
+speed v, the intercepting shot leaves at sin(aim) = v / shot speed at any distance, so the aiming error is a weighted
+sum of two inputs. One hidden unit carries that error to the turn output. Four sharp tanh units act as an AND gate on
+the fire output: error inside a tolerance on either side, rock ahead, rock in range.
+
+The danger field gives each of the four visible rocks two units on closeness, bearing and forward relative speed, so a
+moving rock counts from where it will be a second later. One says the rock blocks the way ahead, the other that it
+threatens from behind. Thrust is the balance of the two: it advances while the way ahead is open and it's under
+140 px/s, holds when something blocks it, and burns away when danger behind outweighs danger ahead. A left/right pair
+per rock turns away from a close rock, outvoting the aim.
 
 ## Running
 
@@ -59,7 +65,7 @@ just up           # launch the GUI, needs a display
 just evolve 300   # evolve headless, resumes from and saves swarm.npz + weights.npz
 just cc-stats weights.npz 100   # how a weights file plays on 100 fixed fields
 just cc-shot 6    # headless screenshots shot-watch.png / shot-fly.png, 6 s in
-just cc-calculated weights.npz   # build the turret pilot without training
+just cc-calculated weights.npz   # build the hunter pilot without training
 just cc-video weights-opus.npz 0 30 shards-turret.mp4   # record 30 s of the playing field
 ```
 

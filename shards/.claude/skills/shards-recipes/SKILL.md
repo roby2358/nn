@@ -13,7 +13,7 @@ description: Project helper recipes for shards (cc- prefixed justfile recipes). 
 - `just cc-shot <seconds>`: runs the App headless and saves `shot-watch.png` (the champion, that many seconds in)
   and `shot-fly.png` (a held burn with the trigger down, to see the flame). Read the PNGs to check visuals. They are
   gitignored.
-- `just cc-calculated <out.npz>`: builds the hand-made turret pilot with no training and writes it to that file,
+- `just cc-calculated <out.npz>`: builds the hand-made hunter pilot with no training and writes it to that file,
   replacing anything already there. Measure it with `cc-stats`.
 - `just cc-video <weights.npz> <seed> <seconds> <out.mp4>`: records that pilot on one field at real speed, playing
   field only, with the weights file's name in the HUD.

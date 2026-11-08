@@ -44,7 +44,7 @@ cc-stats weights n:
 cc-shot seconds:
     {{python}} -m shards.shot {{seconds}}
 
-# Build the hand-made turret pilot, without training, into the given weights file
+# Build the hand-made hunter pilot, without training, into the given weights file
 cc-calculated out:
     {{python}} -m shards.calculated {{out}}
 

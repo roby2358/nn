@@ -36,8 +36,8 @@ SPEED_HI = np.array([0.0, 150.0, 105.0, 70.0])
 POINTS = np.array([0.0, 3.0, 2.0, 1.0])
 
 # ---- waves --------------------------------------------------------------------------
-WAVE_BASE = 4             # big rocks in the first wave; each later wave adds one
-WAVE_MAX = 8
+WAVE_BASE = 6             # big rocks in the first wave; each later wave adds one
+WAVE_MAX = 12
 ROCK_SLOTS = WAVE_MAX * 4  # a big rock is at most four small rocks at once
 WAVE_TABLE = 16           # distinct waves stored per scenario, then they repeat
 DRIFT_TABLE = 256         # stored rock drifts per scenario, then they repeat

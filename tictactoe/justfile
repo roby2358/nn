@@ -1,0 +1,45 @@
+# Environment is split from running: the container can create a venv and
+# run tests headless, but the GUI needs a display, so `just up` is for the host.
+# The project dir is shared between container and host, so each side gets its
+# own venv, named by hostname (override with VENV=path just setup).
+
+set shell := ["bash", "-cu"]
+
+venv := env("VENV", ".venv-" + `hostname`)
+python := venv / "bin/python"
+
+default:
+    @just --list
+
+# Create the per-host venv and install the project (editable) with dev deps
+setup:
+    uv venv --allow-existing {{venv}}
+    uv pip install --python {{python}} -e ".[dev]"
+
+# Alias for setup
+install: setup
+
+# Launch the game (host, needs a display)
+up:
+    {{python}} -m tictactoe.game
+
+# Run tests headless (works in the container)
+test:
+    SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy {{python}} -m pytest -q
+
+# Show which venv this host uses
+which:
+    @echo {{venv}}
+
+# Remove this host's venv and build artifacts
+clean:
+    rm -rf {{venv}} build dist *.egg-info .pytest_cache
+    find . -name __pycache__ -type d -exec rm -rf {} +
+
+# Train the self-play net headless (works in the container); saves weights.npz
+train steps="300":
+    {{python}} -m tictactoe.ai.train {{steps}}
+
+# Exhaustively check the greedy net against every opponent line (default: weights.npz)
+verify *files="weights.npz":
+    {{python}} verify.py {{files}}

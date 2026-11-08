@@ -1,0 +1,8 @@
+*.npz
+.venv*/
+__pycache__/
+.idea/
+*.egg-info/
+.pytest_cache/
+build/
+dist/

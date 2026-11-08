@@ -1,0 +1,70 @@
+# Environment is split from running: the container can create a venv, run tests and
+# evolve headless, but the GUI needs a display, so `just up` is for the host.
+# The project dir is shared between container and host, so each side gets its own
+# venv, named by hostname (override with VENV=path just setup).
+
+set shell := ["bash", "-cu"]
+
+venv := env("VENV", ".venv-" + `hostname`)
+python := venv / "bin/python"
+
+default:
+    @just --list
+
+# Create the per-host venv and install the project (editable) with dev deps
+setup:
+    uv venv --allow-existing {{venv}}
+    uv pip install --python {{python}} -e ".[dev]"
+
+# Launch the game (host, needs a display)
+up:
+    {{python}} -m crystalchase.game
+
+# Run tests headless (works in the container)
+test:
+    SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy {{python}} -m pytest -q
+
+# Evolve headless (works in the container); resumes from and saves swarm.npz + weights.npz
+evolve gens="200":
+    {{python}} -m crystalchase.evolve {{gens}}
+
+# Show which venv this host uses
+which:
+    @echo {{venv}}
+
+# Remove this host's venv and build artifacts
+clean:
+    rm -rf {{venv}} build dist *.egg-info .pytest_cache
+    find . -name __pycache__ -type d -exec rm -rf {} +
+
+# Save headless screenshots of a replay and a race, N seconds in (for docs / visual checks)
+cc-shot seconds="6":
+    {{python}} -m crystalchase.shot {{seconds}}
+
+# Fly the saved champion on N fresh courses and report crashes (when/where) and crystals
+cc-laps n="40":
+    {{python}} -m crystalchase.laps {{n}}
+
+# Fly the autopilot and the given pilot files on the same N courses; show where the time goes
+cc-compare n +files:
+    {{python}} -m crystalchase.compare {{n}} {{files}}
+
+# Film the whole window as a looping MP4: try N crystal rings, film the best-closing one
+cc-loop-video n="100" out="crystal-loop.mp4":
+    {{python}} -m crystalchase.loop_video {{n}} {{out}}
+
+# Film one 30-second training course: the saved champion among random nets
+cc-swarm-video seed="0" out="crystal-swarm.mp4":
+    {{python}} -m crystalchase.swarm_video {{seed}} {{out}}
+
+# Compare the saved swarm and leader to a reference net, by weights and by flying them
+cc-lineage n reference:
+    {{python}} -m crystalchase.lineage {{n}} {{reference}}
+
+# Read a sector net's design constants and new terms from its weights alone (no flying)
+cc-weights reference evolved:
+    {{python}} -m crystalchase.weight_anatomy {{reference}} {{evolved}}
+
+# Choose the calculated sector net's design constants by evaluation only (no training)
+cc-sector-search:
+    {{python}} -m crystalchase.sector_search

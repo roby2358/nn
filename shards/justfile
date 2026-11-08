@@ -1,0 +1,45 @@
+# The project dir is shared between container and host, so each side gets its
+# own venv, named by hostname (override with VENV=path just setup).
+# The container can test and evolve headless; the GUI needs a display (`just up`).
+
+set shell := ["bash", "-cu"]
+
+venv := env("VENV", ".venv-" + `hostname`)
+python := venv / "bin/python"
+
+default:
+    @just --list
+
+# Create the per-host venv and install the project (editable) with dev deps
+setup:
+    uv venv --allow-existing {{venv}}
+    uv pip install --python {{python}} -e ".[dev]"
+
+# Launch the game (needs a display)
+up:
+    {{python}} -m shards.game
+
+# Run tests headless (works in the container)
+test:
+    SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy {{python}} -m pytest -q
+
+# Evolve headless (works in the container); resumes from and saves swarm.npz + weights.npz
+evolve gens:
+    {{python}} -m shards.evolve {{gens}}
+
+# Show which venv this host uses
+which:
+    @echo {{venv}}
+
+# Remove this host's venv and build artifacts
+clean:
+    rm -rf {{venv}} build dist *.egg-info .pytest_cache
+    find . -name __pycache__ -type d -exec rm -rf {} +
+
+# Fly a weights file on N fixed fields and report how it plays
+cc-stats weights n:
+    {{python}} -m shards.stats {{weights}} {{n}}
+
+# Save a headless screenshot of the champion, N seconds into a round
+cc-shot seconds:
+    {{python}} -m shards.shot {{seconds}}

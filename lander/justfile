@@ -1,0 +1,49 @@
+# The project dir is shared between container and host, so each side gets its
+# own venv, named by hostname (override with VENV=path just setup).
+# The container can run tests headless; the GUI needs a display (`just up`).
+
+set shell := ["bash", "-cu"]
+
+venv := env("VENV", ".venv-" + `hostname`)
+python := venv / "bin/python"
+
+default:
+    @just --list
+
+# Create the per-host venv and install the project (editable) with dev deps
+setup:
+    uv venv --allow-existing {{venv}}
+    uv pip install --python {{python}} -e ".[dev]"
+
+# Launch the game (needs a display)
+up:
+    {{python}} -m lander.game
+
+# Run tests headless (works in the container)
+test:
+    SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy {{python}} -m pytest -q
+
+# Show which venv this host uses
+which:
+    @echo {{venv}}
+
+# Remove this host's venv and build artifacts
+clean:
+    rm -rf {{venv}} build dist *.egg-info .pytest_cache
+    find . -name __pycache__ -type d -exec rm -rf {} +
+
+# Headless training (works in the container); continues from and saves weights.npz
+train steps="300":
+    {{python}} -m lander.ai.train {{steps}}
+
+# Build the hand-wired suicide-burn weights, measure them, and write weights.npz
+cc-plummet rounds="5000":
+    {{python}} -m lander.ai.plummet {{rounds}}
+
+# Report how a weights file flies: landing rate, burn timing, speeds
+cc-flight-stats weights="weights.npz" rounds="5000":
+    {{python}} -m lander.ai.flight_stats {{weights}} {{rounds}}
+
+# Render the current net's landings to an mp4, scene only (no display needed)
+cc-record count="8" out="landings.mp4":
+    {{python}} -m lander.record {{count}} {{out}}

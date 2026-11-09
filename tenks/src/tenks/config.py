@@ -15,6 +15,7 @@ RUN_SECONDS = 30.0
 RUN_STEPS = int(round(RUN_SECONDS / DT))
 FREE_PLAY_STEPS = math.inf   # a battle you drive in yourself has no clock
 GENS_PER_PRESS = 500         # one press of Evolve in the GUI
+SAVE_EVERY = 100             # headless evolution writes swarm and weights this often, in generations
 
 # ---- teams: tanks 0..7 are green, 8..15 are blue -----------------------------------
 TEAM_SIZE = 8

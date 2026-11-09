@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 
 from .config import (CROSSOVER_GENE_ODDS, CROSSOVER_RATE, DEALS_PER_GEN, ELITES, MUTATION_SIGMAS, POP_SIZE, RUN_STEPS,
-                     TANKS)
+                     SAVE_EVERY, TANKS)
 from .pilots import Brains, load_roster, random_genomes, save_champion, seat
 from .scenario import Scenario, make_scenario
 from .worlds import Worlds
@@ -200,7 +200,8 @@ class BackgroundEvolver(threading.Thread):
 
 
 def main() -> None:
-    """Headless evolution: `just evolve <gens>`. Resumes from swarm.npz / weights.npz if present."""
+    """Headless evolution: `just evolve <gens>`. Resumes from swarm.npz / weights.npz if present,
+    and saves them every SAVE_EVERY generations and at the end."""
     gens = int(sys.argv[1])
     ev = Evolver(int(time.time()))
     if SWARM.exists() or WEIGHTS.exists():
@@ -212,6 +213,9 @@ def main() -> None:
               f"per tank: kills {s.kills:4.2f} friendly {s.friendly_kills:4.2f} near {s.near_misses:4.2f} "
               f"shots {s.shots:4.1f} alive {s.survived:4.1f}s  decided {s.decided:4.0%}  "
               f"{time.perf_counter() - t0:6.1f}s", flush=True)
+        if s.gen % SAVE_EVERY == 0:
+            ev.save(SWARM, WEIGHTS)
+            print(f"saved {SWARM} and {WEIGHTS}", flush=True)
     ev.save(SWARM, WEIGHTS)
     print(f"saved {SWARM} and {WEIGHTS}")
 

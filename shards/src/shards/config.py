@@ -11,9 +11,9 @@ FIELD_W = 720.0
 FIELD_H = 720.0
 FIELD = np.array([FIELD_W, FIELD_H])
 DT = 1.0 / 60.0           # fixed physics step, identical headless and in the GUI
-RUN_SECONDS = 30.0        # the limit on a round in training and when watching
+RUN_SECONDS = 30.0        # the limit on a round in training
 RUN_STEPS = int(round(RUN_SECONDS / DT))
-FREE_PLAY_STEPS = math.inf  # a round you fly yourself ends only when you crash
+FREE_PLAY_STEPS = math.inf  # a round on screen, flown by you or the champion, ends only in a crash
 
 # ---- ship: coasts on inertia, bleeds a little speed, and wraps at the edges ------
 THRUST = 340.0            # px/s^2 at full thrust

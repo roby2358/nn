@@ -8,6 +8,7 @@ import pygame  # noqa: E402
 import pytest  # noqa: E402
 
 from shards import art  # noqa: E402
+from shards.config import FREE_PLAY_STEPS  # noqa: E402
 from shards.game import END_HOLD_FRAMES, App  # noqa: E402
 
 
@@ -30,6 +31,12 @@ def test_fly_toggles_between_human_and_champion(app):
     assert app.scene.pilot is app.human
     app.toggle_fly()
     assert app.scene.pilot is not app.human
+
+
+def test_rounds_on_screen_have_no_time_limit(app):
+    assert app.scene.world.step_limit == FREE_PLAY_STEPS      # Watch, where the game opens
+    app.toggle_fly()
+    assert app.scene.world.step_limit == FREE_PLAY_STEPS
 
 
 def test_held_keys_reach_the_ship(app):

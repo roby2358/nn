@@ -43,7 +43,7 @@ TOL_CLOSE = 0.05
 TOL_SIZE = 0.05
 FIRE_BIAS = -3.5        # four units at +1 clear this; any one at -1 does not
 
-LOOK_AHEAD = 1.0        # seconds; a moving rock counts from where it will be this much later
+LOOK_AHEAD = 1.5        # seconds; a moving rock counts from where it will be this much later
 CLEAR_AHEAD = 130.0     # px of clear space a rock dead ahead must leave for the way to count as open
 BLOCK_SLANT = 0.1       # how much less a rock counts as blocking per unit of bearing away from dead ahead
 DANGER = 75.0           # px of clear space at which a rock abeam counts as a threat

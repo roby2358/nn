@@ -12,7 +12,7 @@ import numpy as np
 import pygame
 
 from . import art
-from .config import DT, FIELD_H, FIELD_W, FREE_PLAY_STEPS, GENS_PER_PRESS, RUN_STEPS
+from .config import DT, FIELD_H, FIELD_W, FREE_PLAY_STEPS, GENS_PER_PRESS
 from .evolve import SWARM, WEIGHTS, BackgroundEvolver, Evolver
 from .pilots import HumanPilot, Pilot
 from .scenario import make_scenario
@@ -111,7 +111,7 @@ FLY = Mode("Watch", "Left/right turn, up thrusts, space fires, R restarts.",
            lambda app: 1)
 WATCH = Mode("Fly", "Watching the champion.",
              lambda app, seed: Round(f"champion, gen {app.evolver.gen}", app.evolver.champion(), seed, app.rng,
-                                     RUN_STEPS),
+                                     FREE_PLAY_STEPS),
              lambda app: SPEEDS[app.speed])
 
 

@@ -20,7 +20,7 @@ Shots add the ship's velocity, last about a second, and only four can be in the 
 
 A shot breaks a big rock into two medium ones, a medium into two small, and a small rock is gone. Smaller rocks drift
 faster and score more: 1, 2 and 3 points for big, medium and small. Clearing the field brings a new wave with one more
-big rock, up to twelve, appearing anywhere at least 170 px from the ship. Touching a rock ends the round. A round you fly yourself has no time limit; in training and Watch it lasts at most 30 s.
+big rock, up to twelve, appearing anywhere at least 170 px from the ship. Touching a rock ends the round. A round on screen, in Fly or Watch, has no time limit and shows no countdown; in training it lasts at most 30 s.
 
 ## The pilot
 
@@ -49,7 +49,7 @@ sum of two inputs. One hidden unit carries that error to the turn output. Four s
 the fire output: error inside a tolerance on either side, rock ahead, rock in range.
 
 The danger field gives each of the four visible rocks two units on closeness, bearing and forward relative speed, so a
-moving rock counts from where it will be a second later. One says the rock blocks the way ahead, the other that it
+moving rock counts from where it will be a second and a half later. One says the rock blocks the way ahead, the other that it
 threatens from behind. Thrust is the balance of the two: it advances while the way ahead is open and it's under
 140 px/s, eases off to a trickle when something blocks it, and burns away when danger behind outweighs danger ahead. A left/right pair
 per rock turns away from a close rock, outvoting the aim.

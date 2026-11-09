@@ -44,11 +44,11 @@ TOL_SIZE = 0.05
 FIRE_BIAS = -3.5        # four units at +1 clear this; any one at -1 does not
 
 LOOK_AHEAD = 1.5        # seconds; a moving rock counts from where it will be this much later
-CLEAR_AHEAD = 130.0     # px of clear space a rock dead ahead must leave for the way to count as open
+CLEAR_AHEAD = 260.0     # px of clear space a rock dead ahead must leave for the way to count as open
 BLOCK_SLANT = 0.1       # how much less a rock counts as blocking per unit of bearing away from dead ahead
-DANGER = 75.0           # px of clear space at which a rock abeam counts as a threat
+DANGER = 60.0           # px of clear space at which a rock abeam counts as a threat
 CHASE_SLANT = 0.15      # how much sooner a rock behind is a threat, and later one ahead
-CRUISE = 140.0          # px/s of forward speed above which the way ahead earns no more thrust
+CRUISE = 100.0          # px/s of forward speed above which the way ahead earns no more thrust
 OPEN_WEIGHT = 3.0       # what an open way, or cruising speed, says to thrust
 BLOCK_WEIGHT = 2.0      # one blocking rock cuts an open way's thrust to a trickle
 CHASE_WEIGHT = 4.0      # one threat behind outweighs one rock blocking the way

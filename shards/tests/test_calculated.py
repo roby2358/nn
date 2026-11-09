@@ -55,8 +55,8 @@ def test_it_eases_off_when_a_rock_blocks_the_way():
 
 
 def test_a_rock_coming_at_the_nose_blocks_the_way_sooner():
-    assert hunter().act(seen(0.0, 1.0, 0.6, 0.0, 1.0))[0, CMD_THRUST] > 0.9
-    assert hunter().act(seen(0.0, 1.0, 0.6, 0.0, 1.0, v_forward=-100.0 / SPEED_SCALE))[0, CMD_THRUST] < 0.2
+    assert hunter().act(seen(0.0, 1.0, 0.3, 0.0, 1.0))[0, CMD_THRUST] > 0.9
+    assert hunter().act(seen(0.0, 1.0, 0.3, 0.0, 1.0, v_forward=-100.0 / SPEED_SCALE))[0, CMD_THRUST] < 0.2
 
 
 def test_it_stops_advancing_at_cruising_speed():

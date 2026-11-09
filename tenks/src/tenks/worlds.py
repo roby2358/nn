@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .config import (CLOSE, CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, COS, DT, FIELD, FIRE_ABOVE,
-                     FRIENDLY_KILL_COST, KILL_POINTS, MAX_SPEED, MUZZLE_GAP, N_INPUTS, NEAR_MISS_POINTS, NEAR_MISS_R, NEAREST, N_OUTPUTS,
+                     FRIENDLY_KILL_COST, GUN_COS, GUN_SIN, KILL_POINTS, LOADED, MAX_SPEED, MUZZLE_GAP, N_INPUTS, NEAR_MISS_POINTS, NEAR_MISS_R, NEAREST, N_OUTPUTS,
                      RELOAD, SENSE_RANGE, SHELL_LIFE, SHELL_SPEED, SIN, SPLASH_R, SURVIVAL_POINTS, TANK_R,
                      TANKS, TEAM_SIZE, TURN_RATE)
 from .geometry import dot, length
@@ -74,30 +74,36 @@ class Worlds:
 
     def observe(self) -> np.ndarray:
         """(W*T, N_INPUTS): gun ready, the NEAREST live enemies, then the NEAREST live friends.
-        Each is in the tank's own frame and closest first; an absent contact, or a dead tank's view, is zeros."""
+        Each is closest first; an absent contact, or a dead tank's view, is zeros."""
         delta, dist = self._tank_offsets()
         seen = self.alive[:, :, None] & self.alive[:, None]
-        nose = self.nose()
-        enemies = self._contacts(delta, dist, seen & ENEMY, nose)
-        friends = self._contacts(delta, dist, seen & FRIEND, nose)
         gun = (self.cooldown <= 0.0) & self.alive
+        views = self._views(delta, dist, gun)
+        enemies = self._contacts(views, dist, seen & ENEMY)
+        friends = self._contacts(views, dist, seen & FRIEND)
         rows = np.concatenate([gun[:, :, None], enemies, friends], axis=2)
         return rows.reshape(self.count * TANKS, N_INPUTS)
 
-    def _contacts(self, delta: np.ndarray, dist: np.ndarray, visible: np.ndarray, nose: np.ndarray) -> np.ndarray:
+    def _views(self, delta: np.ndarray, dist: np.ndarray, gun: np.ndarray) -> np.ndarray:
+        """(W, T, T, CONTACT_INPUTS): what each tank i sees of each tank j. Bearing is in i's own frame.
+        How far j's gun points off i is the bearing of i in j's frame, so it's the same array transposed."""
+        forward = self.nose()[:, :, None]
+        side = np.stack([-forward[..., 1], forward[..., 0]], axis=3)
+        span = np.maximum(dist, 1e-9)
+        views = np.zeros((self.count, TANKS, TANKS, CONTACT_INPUTS))
+        views[..., SIN] = dot(delta, side) / span
+        views[..., COS] = dot(delta, forward) / span
+        views[..., CLOSE] = np.clip(1.0 - span / SENSE_RANGE, 0.0, 1.0)
+        views[..., GUN_SIN] = views[..., SIN].swapaxes(1, 2)
+        views[..., GUN_COS] = views[..., COS].swapaxes(1, 2)
+        views[..., LOADED] = gun[:, None]
+        return views
+
+    def _contacts(self, views: np.ndarray, dist: np.ndarray, visible: np.ndarray) -> np.ndarray:
         """(W, T, NEAREST * CONTACT_INPUTS) for the visible tanks closest to each tank."""
         rows, cols, _ = np.ogrid[:self.count, :TANKS, :1]
         near = np.argsort(np.where(visible, dist, np.inf), axis=2)[:, :, :NEAREST]
-        present = visible[rows, cols, near]
-        offset = delta[rows, cols, near]
-        span = np.maximum(dist[rows, cols, near], 1e-9)
-        forward = nose[:, :, None]
-        side = np.stack([-forward[..., 1], forward[..., 0]], axis=3)
-        contacts = np.zeros((self.count, TANKS, NEAREST, CONTACT_INPUTS))
-        contacts[..., SIN] = dot(offset, side) / span
-        contacts[..., COS] = dot(offset, forward) / span
-        contacts[..., CLOSE] = np.clip(1.0 - span / SENSE_RANGE, 0.0, 1.0)
-        contacts *= present[..., None]
+        contacts = views[rows, cols, near] * visible[rows, cols, near][..., None]
         return contacts.reshape(self.count, TANKS, NEAREST * CONTACT_INPUTS)
 
     def step(self, commands: np.ndarray) -> None:

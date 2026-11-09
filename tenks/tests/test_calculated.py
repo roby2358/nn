@@ -5,10 +5,12 @@ import math
 import numpy as np
 import pytest
 
-from tenks.calculated import MIN_RANGE, STOP_RANGE, charger, closeness
-from tenks.config import (CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, FIRE_ABOVE, N_INPUTS, NEAREST, SELF_INPUTS,
-                          SENSE_RANGE)
+from tenks.calculated import MIN_RANGE, STOP_RANGE, VEER_DEGREES, charger, closeness
+from tenks.config import (CLOSE, CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, FIRE_ABOVE, GUN_COS, GUN_SIN, LOADED,
+                          N_INPUTS, NEAREST, RUN_STEPS, SELF_INPUTS, SENSE_RANGE, TANKS)
 from tenks.pilots import GENOME, Brains
+from tenks.scenario import Scenario
+from tenks.worlds import Worlds
 
 Contact = tuple[float, float]    # degrees off the nose (positive is the +sin side), px away
 
@@ -19,8 +21,8 @@ def view(enemies: list[Contact], friends: list[Contact]) -> np.ndarray:
     for first, contacts in ((SELF_INPUTS, enemies), (SELF_INPUTS + NEAREST * CONTACT_INPUTS, friends)):
         for slot, (degrees, px) in enumerate(contacts):
             bearing = math.radians(degrees)
-            obs[first + slot * CONTACT_INPUTS:first + (slot + 1) * CONTACT_INPUTS] = (
-                math.sin(bearing), math.cos(bearing), closeness(px))
+            start = first + slot * CONTACT_INPUTS
+            obs[start:start + CLOSE + 1] = math.sin(bearing), math.cos(bearing), closeness(px)
     return obs
 
 
@@ -35,6 +37,18 @@ def command(net, enemies: list[Contact], friends: list[Contact]) -> np.ndarray:
 
 def shoots(net, enemies: list[Contact], friends: list[Contact]) -> bool:
     return bool(command(net, enemies, friends)[CMD_SHOOT] > FIRE_ABOVE)
+
+
+def facing(net, bearing: float, px: float, gun_off: float, loaded: bool) -> np.ndarray:
+    """The command for one enemy at (bearing, px) whose gun points gun_off degrees off this tank."""
+    obs = view([(bearing, px)], [])
+    obs[SELF_INPUTS + GUN_SIN], obs[SELF_INPUTS + GUN_COS] = math.sin(math.radians(gun_off)), math.cos(math.radians(gun_off))
+    obs[SELF_INPUTS + LOADED] = float(loaded)
+    return net.act(obs[None])[0]
+
+
+def fires(out: np.ndarray) -> bool:
+    return bool(out[CMD_SHOOT] > FIRE_ABOVE)
 
 
 def test_the_design_fits_the_genome():
@@ -123,6 +137,50 @@ def test_on_the_approach_a_drifted_nearest_teammate_tilts_the_heading_toward_it(
 def test_in_range_spacing_leaves_the_aim_alone(net):
     alone = turn(command(net, [(0.0, 150.0)], []))
     assert turn(command(net, [(0.0, 150.0)], [(70.0, 18.0)])) == pytest.approx(alone, abs=0.05)
+
+
+@pytest.mark.parametrize("gun_off", [0.0, 10.0, 30.0])
+def test_holds_fire_on_a_loaded_gun_that_could_swing_back_in_time(net, gun_off):
+    assert not fires(facing(net, 0.0, 150.0, gun_off, True))
+
+
+def test_fires_on_a_loaded_gun_turned_too_far_to_answer(net):
+    assert fires(facing(net, 0.0, 150.0, 70.0, True))
+
+
+def test_a_shorter_shell_flight_narrows_what_counts_as_able_to_answer(net):
+    assert fires(facing(net, 0.0, 60.0, 30.0, True))
+
+
+def test_fires_on_a_reloading_gun_even_when_it_points_straight_back(net):
+    assert fires(facing(net, 0.0, 150.0, 0.0, False))
+
+
+def test_veers_off_a_nearest_enemy_that_could_answer(net):
+    assert abs(turn(facing(net, 0.0, 150.0, 0.0, True))) > 0.5
+
+
+def test_the_veer_settles_at_its_angle_off_the_enemy(net):
+    assert turn(facing(net, -VEER_DEGREES, 150.0, 0.0, True)) == pytest.approx(0.0, abs=0.1)
+
+
+@pytest.mark.parametrize("px, gun_off, loaded", [(150.0, 0.0, False), (150.0, 70.0, True), (260.0, 0.0, True)])
+def test_no_veer_when_it_cannot_answer_or_is_out_of_reach(net, px, gun_off, loaded):
+    assert turn(facing(net, 0.0, px, gun_off, loaded)) == pytest.approx(0.0, abs=0.05)
+
+
+@pytest.mark.parametrize("nudge", [0.002, -0.01, 0.05, 0.2])
+def test_two_tanks_meeting_head_on_do_not_both_die(nudge):
+    spots, headings = np.zeros((TANKS, 2)), np.zeros(TANKS)
+    spots[0], spots[8] = (200.0, 360.0), (520.0, 360.0 + 40.0 * nudge)
+    headings[0], headings[8] = nudge, math.pi
+    worlds = Worlds([Scenario(0, spots, headings)], RUN_STEPS)
+    worlds.alive[0] = False
+    worlds.alive[0, [0, 8]] = True
+    brains = Brains(np.tile(charger(), (TANKS, 1)))
+    while not worlds.done and not worlds.over[0]:
+        worlds.step(brains.act(worlds.observe()))
+    assert worlds.alive[0].sum() == 1
 
 
 def test_a_teammate_close_ahead_slows_the_tank(net):

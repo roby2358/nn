@@ -1,10 +1,11 @@
 """A charging tank built algebraically, with no training: `just cc-calculated <out.npz>`.
 
-The result is an ordinary genome in the 25 -> 48 -> 16 -> 3 net that evolution uses. The first hidden layer
+The result is an ordinary genome in the 49 -> 48 -> 16 -> 3 net that evolution uses. The first hidden layer
 cuts the inputs with sharp half-planes, the second ANDs them into facts, and the outputs weigh the facts.
 
-Shooting is (any enemy in the sights) AND NOT (any teammate in the danger zone). Each visible enemy gets one
-AND unit and each visible teammate gets another. One line of sight is enough to fire, and because a single
+Shooting is (any enemy in the sights that can't answer) AND NOT (any teammate in the danger zone). An enemy can't
+answer if its gun is reloading, or if it points too far off this tank to swing back before the shell lands. Each
+visible enemy gets one AND unit and each visible teammate gets another. One line of sight is enough to fire, and because a single
 veto outweighs all four sights, one teammate is enough to hold. A shell only goes off on contact or at full
 range, so the sights are as wide as a tank up close, and the danger zone is as wide as a blast the whole way
 out. Bearing tolerance is an affine fit in closeness to the shape width / distance.
@@ -16,15 +17,22 @@ drive, so a tank spins in place until it's pointing roughly the right way and on
 On the approach, teammates bias the heading to hold them just outside a blast's reach: steer away from any
 that are too close, and toward the nearest if it has drifted off. Once an enemy is in range the bias switches
 off so the gun stays on target, and spacing can only slow a tank that's about to run into a teammate ahead.
+
+A tank in reach of a nearest enemy that could answer veers about 30 degrees off it and keeps closing. That tilt
+holds it out of the firing rule at long range, but the allowance for swinging back shrinks with range. Near 90 px
+each tank's tilt is too big to answer from, so both turn back in, and the first to come round keeps the other
+tilted: a loaded gun on it is a reason to veer. That breaks the tie between two tanks locked head-on.
 """
 
+import math
 import sys
 from pathlib import Path
 
 import numpy as np
 
-from .config import (CLOSE, CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, COS, N_HIDDEN_1, N_HIDDEN_2, N_INPUTS,
-                     N_OUTPUTS, NEAREST, SELF_INPUTS, SENSE_RANGE, SHELL_RANGE, SIN, SPLASH_R)
+from .config import (CLOSE, CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, COS, GUN_COS, LOADED, N_HIDDEN_1,
+                     N_HIDDEN_2, N_INPUTS, N_OUTPUTS, NEAREST, SELF_INPUTS, SENSE_RANGE, SHELL_RANGE, SHELL_SPEED, SIN,
+                     SPLASH_R, TURN_RATE)
 from .pilots import save_champion
 
 SHARP = 100.0           # how hard a first-layer half-plane switches
@@ -45,7 +53,10 @@ STOP_SOFTNESS = 40.0    # drive per unit of closeness around the stop distance
 DRIVE = 1.5             # tread signal at full charge
 TURN_GAIN = 20.0        # turn signal per unit of sin bearing
 ASTERN_COS = -0.9       # an enemy this far behind gets a fixed kick, because sin alone can't break the tie
-ASTERN_TURN = 8.0
+VEER_DEGREES = 30.0     # the same kick, against TURN_GAIN, settles the heading this far off an enemy that could answer
+KICK_TURN = TURN_GAIN * math.sin(math.radians(VEER_DEGREES))
+ANSWER_NEAR, ANSWER_FAR = 60.0, 190.0        # px; the ranges the could-it-answer allowance is fitted through
+UNLOADED_MARGIN = 3.0   # outweighs any gun angle, so a reloading gun can never answer
 
 REPEL_R = 22.0          # px; just outside a blast, measured to a teammate 30 degrees off the nose
 REPEL_SLANT = 0.042     # how much sooner a teammate abeam counts as too close
@@ -65,10 +76,11 @@ LINE_L, LINE_R, FRIEND_NEAR = (NOT_POINT_BLANK + 1 + kind * NEAREST for kind in 
 AIM, RANGE, APPROACH, ASTERN = range(FRIEND_NEAR + NEAREST, FRIEND_NEAR + NEAREST + 4)
 REPEL_POS, REPEL_NEG, BLOCK = (ASTERN + 1 + kind * NEAREST for kind in range(3))
 DRIFTED, HAS_FRIEND, FRIEND_SIDE = range(BLOCK + NEAREST, BLOCK + NEAREST + 3)
+CANT_ANSWER = FRIEND_SIDE + 1   # the first of NEAREST units
 
 # second hidden layer
 FIRE, VETO = 0, NEAREST     # the first of NEAREST units of each
-AIM_2, RANGE_2, ASTERN_2, SPACE_POS, SPACE_NEG, ATTRACT_POS, ATTRACT_NEG, BLOCKED = range(2 * NEAREST, N_HIDDEN_2)
+AIM_2, RANGE_2, KICK, SPACE_POS, SPACE_NEG, ATTRACT_POS, ATTRACT_NEG, BLOCKED = range(2 * NEAREST, N_HIDDEN_2)
 
 
 def closeness(px: float) -> float:
@@ -87,6 +99,11 @@ def tolerance(near_px: float, near_tol: float, far_px: float, far_tol: float) ->
     """(slope, intercept) of a bearing tolerance that's linear in closeness, through two ranges."""
     slope = (near_tol - far_tol) / (closeness(near_px) - closeness(far_px))
     return slope, far_tol - slope * closeness(far_px)
+
+
+def swing_back_cos(px: float) -> float:
+    """Cos of the angle a gun can swing through in the time a shell takes to cover this range."""
+    return math.cos(TURN_RATE * px / SHELL_SPEED)
 
 
 class Wiring:
@@ -135,11 +152,16 @@ class Wiring:
 def wire_shooting(net: Wiring) -> None:
     sights = tolerance(SIGHT_NEAR, SIGHT_NEAR_TOL, SIGHT_FAR, SIGHT_FAR_TOL)
     line = tolerance(LINE_NEAR, LINE_NEAR_TOL, LINE_FAR, LINE_FAR_TOL)
+    answer_slope, answer_intercept = tolerance(ANSWER_NEAR, swing_back_cos(ANSWER_NEAR),
+                                               ANSWER_FAR, swing_back_cos(ANSWER_FAR))
     net.plane(NOT_POINT_BLANK, {enemy(0, CLOSE): -1.0}, closeness(MIN_RANGE))
     for k in range(NEAREST):
         net.bearing_window(SIGHT_L + k, SIGHT_R + k, enemy(k, SIN), enemy(k, COS), enemy(k, CLOSE), sights)
         net.plane(REACH + k, {enemy(k, CLOSE): 1.0}, -closeness(FIRE_RANGE))
-        net.all_of(FIRE + k, [(SIGHT_L + k, 1.0), (SIGHT_R + k, 1.0), (REACH + k, 1.0), (NOT_POINT_BLANK, 1.0)])
+        net.plane(CANT_ANSWER + k, {enemy(k, GUN_COS): -1.0, enemy(k, CLOSE): answer_slope,
+                                    enemy(k, LOADED): -UNLOADED_MARGIN}, answer_intercept + UNLOADED_MARGIN)
+        net.all_of(FIRE + k, [(SIGHT_L + k, 1.0), (SIGHT_R + k, 1.0), (REACH + k, 1.0), (NOT_POINT_BLANK, 1.0),
+                              (CANT_ANSWER + k, 1.0)])
     for j in range(NEAREST):
         net.bearing_window(LINE_L + j, LINE_R + j, friend(j, SIN), friend(j, COS), friend(j, CLOSE), line)
         net.plane(FRIEND_NEAR + j, {friend(j, CLOSE): 1.0}, -closeness(FRIEND_REACH))
@@ -159,9 +181,17 @@ def wire_charge(net: Wiring) -> None:
     net.treads(RANGE_2, DRIVE / LINEAR, 0.0)
 
     net.plane(ASTERN, {enemy(0, COS): -1.0}, ASTERN_COS)
-    net.all_of(ASTERN_2, [(ASTERN, 1.0)])
-    net.treads(ASTERN_2, 0.0, ASTERN_TURN / 2.0)
-    net.tread_bias(0.0, ASTERN_TURN / 2.0)
+    wire_kick(net)
+
+
+def wire_kick(net: Wiring) -> None:
+    """One unit for a fixed turn: enemy astern, OR (nearest enemy in reach AND it could answer)."""
+    net.w2[ASTERN, KICK] = 2.0 * GATE
+    net.w2[REACH, KICK] = GATE
+    net.w2[CANT_ANSWER, KICK] = -GATE
+    net.b2[KICK] = GATE
+    net.treads(KICK, 0.0, KICK_TURN / 2.0)
+    net.tread_bias(0.0, KICK_TURN / 2.0)
 
 
 def wire_spacing(net: Wiring) -> None:

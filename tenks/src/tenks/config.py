@@ -47,8 +47,9 @@ NEAR_MISS_POINTS = 0.5    # per near miss
 
 # ---- observation ------------------------------------------------------------------
 NEAREST = 4               # enemies the net can see, and friends too, closest first
-SIN, COS, CLOSE = range(3)  # one contact: bearing as sin and cos, then closeness
-CONTACT_INPUTS = 3
+# one contact: its bearing as sin and cos, its closeness, how far its gun points off me as sin and cos, gun ready
+SIN, COS, CLOSE, GUN_SIN, GUN_COS, LOADED = range(6)
+CONTACT_INPUTS = 6
 SELF_INPUTS = 1           # gun ready
 N_INPUTS = SELF_INPUTS + 2 * NEAREST * CONTACT_INPUTS
 SENSE_RANGE = FIELD_W / 2

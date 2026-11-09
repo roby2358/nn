@@ -5,7 +5,8 @@ import math
 import numpy as np
 import pytest
 
-from tenks.config import (CLOSE, COS, DT, FIELD, FIELD_W, MAX_SPEED, N_INPUTS, N_OUTPUTS, RELOAD, SELF_INPUTS,
+from tenks.config import (CLOSE, CONTACT_INPUTS, COS, DT, FIELD, FIELD_W, GUN_COS, GUN_SIN, LOADED, MAX_SPEED, N_INPUTS, N_OUTPUTS, NEAREST, RELOAD,
+                          SELF_INPUTS,
                           SENSE_RANGE, SHELL_RANGE, SHELL_SPEED, SIN, SPAWN_HALF_BAND, SPAWN_LINE, SPAWN_MARGIN,
                           SPLASH_R, SURVIVAL_POINTS, TANK_R, TANKS, TURN_RATE)
 from tenks.geometry import length
@@ -14,7 +15,7 @@ from tenks.worlds import Worlds
 
 GREEN_A, GREEN_B, BLUE_A, BLUE_B = 0, 1, 8, 9
 ENEMY_BLOCK = SELF_INPUTS
-FRIEND_BLOCK = SELF_INPUTS + 4 * 3
+FRIEND_BLOCK = SELF_INPUTS + NEAREST * CONTACT_INPUTS
 FAR_GREEN, FAR_BLUE = 7, 15
 FAR_SPOTS = {FAR_GREEN: (40.0, 40.0, 0.0), FAR_BLUE: (40.0, 680.0, 0.0)}
 
@@ -213,7 +214,7 @@ def test_observation_lists_nearest_enemies_first_in_the_tanks_own_frame():
     w = arena({GREEN_A: (300.0, 300.0, math.pi / 2), BLUE_A: (300.0, 500.0, 0.0), BLUE_B: (300.0, 400.0, 0.0)})
     obs = w.observe()
     assert obs.shape == (TANKS, N_INPUTS)
-    first, second = obs[GREEN_A, ENEMY_BLOCK:ENEMY_BLOCK + 3], obs[GREEN_A, ENEMY_BLOCK + 3:ENEMY_BLOCK + 6]
+    first, second = obs[GREEN_A, ENEMY_BLOCK:], obs[GREEN_A, ENEMY_BLOCK + CONTACT_INPUTS:]
     assert first[COS] == pytest.approx(1.0)         # dead ahead, since the tank faces +y
     assert first[SIN] == pytest.approx(0.0, abs=1e-9)
     assert first[CLOSE] == pytest.approx(1.0 - 100.0 / SENSE_RANGE)
@@ -231,7 +232,26 @@ def test_observation_friends_leave_out_the_tank_itself_and_absent_slots_are_zero
     w = arena({GREEN_A: (300.0, 300.0, 0.0), GREEN_B: (350.0, 300.0, 0.0)})
     friends = w.observe()[GREEN_A, FRIEND_BLOCK:]
     assert friends[COS] == pytest.approx(1.0)        # teammate B first, never tank A itself
-    assert (friends[6:] == 0.0).all()                # B and the parked spectator fill two slots of four
+    assert (friends[2 * CONTACT_INPUTS:] == 0.0).all()   # B and the parked spectator fill two slots of four
+
+
+def test_observation_shows_where_a_contacts_gun_points_relative_to_the_viewer():
+    aimed = arena({GREEN_A: (300.0, 300.0, 1.0), BLUE_A: (400.0, 300.0, math.pi)})
+    enemy = aimed.observe()[GREEN_A, ENEMY_BLOCK:]
+    assert enemy[GUN_COS] == pytest.approx(1.0)
+    assert enemy[GUN_SIN] == pytest.approx(0.0, abs=1e-9)
+    turned = arena({GREEN_A: (300.0, 300.0, 1.0), BLUE_A: (400.0, 300.0, math.pi / 2)})
+    enemy = turned.observe()[GREEN_A, ENEMY_BLOCK:]
+    assert enemy[GUN_COS] == pytest.approx(0.0, abs=1e-9)
+    assert enemy[GUN_SIN] == pytest.approx(1.0)
+
+
+def test_observation_shows_whether_a_contacts_gun_is_loaded():
+    w = arena({GREEN_A: (300.0, 300.0, 0.0), BLUE_A: (350.0, 300.0, 0.0), GREEN_B: (300.0, 350.0, 0.0)})
+    w.cooldown[0, GREEN_B] = 1.0
+    obs = w.observe()
+    assert obs[GREEN_A, ENEMY_BLOCK + LOADED] == 1.0
+    assert obs[GREEN_A, FRIEND_BLOCK + LOADED] == 0.0
 
 
 def test_dead_tanks_see_nothing_and_are_not_seen():
@@ -241,7 +261,7 @@ def test_dead_tanks_see_nothing_and_are_not_seen():
     assert (obs[BLUE_A] == 0.0).all()
     parked = length(w.pos[0, FAR_BLUE] - w.pos[0, GREEN_A])
     assert obs[GREEN_A, ENEMY_BLOCK + CLOSE] == pytest.approx(max(1.0 - parked / SENSE_RANGE, 0.0))
-    assert (obs[GREEN_A, ENEMY_BLOCK + 3:FRIEND_BLOCK] == 0.0).all()   # the parked blue tank is the only one visible
+    assert (obs[GREEN_A, ENEMY_BLOCK + CONTACT_INPUTS:FRIEND_BLOCK] == 0.0).all()   # the parked blue tank is the only one visible
 
 
 def test_a_decided_battle_freezes_movement_and_survivors_keep_scoring():

@@ -30,28 +30,32 @@ The battlefield is on the left. On the right are the controls and a live chart:
 
 ## The net
 
-- **Inputs (25, all in the tank's own frame):** gun ready, then the four nearest live enemies and the four nearest live
-  teammates, each as bearing (sin, cos) and closeness. An absent contact is zeros. The net sees other tanks' positions
-  only: no enemy heading or speed, no shells, and not the edge of the field.
+- **Inputs (49):** gun ready, then the four nearest live enemies and the four nearest live teammates. Each contact is
+  its bearing in the tank's own frame (sin, cos), its closeness, how far its gun points off this tank (sin, cos, where
+  cos 1 is aimed straight at it), and whether its gun is ready. An absent contact is zeros. The net doesn't see shells
+  or the edge of the field.
 - **Net:** two tanh hidden layers of 48 and 16 units, then left tread, right tread and shoot.
-- **Genome:** 2,083 weights, evolved without gradients.
+- **Genome:** 3,235 weights, evolved without gradients.
 
 ## The calculated tank
 
 `just cc-calculated <out.npz>` builds a tank with no training and writes it as an ordinary genome in the same
-25 -> 48 -> 16 -> 3 net. It uses 44 of the 48 first-layer units and all 16 of the second-layer units. Write it to
+49 -> 48 -> 16 -> 3 net. It uses all 48 first-layer units and all 16 of the second-layer units. Write it to
 `weights.npz` with no `swarm.npz` beside it and `just up` puts it in every tank.
 
 - **Charge:** it turns at the nearest enemy and drives in, stopping 30 px short and backing off if the enemy gets closer.
-- **Fire:** it shoots when any of the four visible enemies is in the sights and within reach. It never fires with the
+- **Fire:** it shoots when any of the four visible enemies is in the sights, within reach and unable to answer: its gun
+  is reloading, or points too far off to swing back before the shell lands. It never fires with the
   nearest enemy inside 25 px, where a hit would catch the shooter too.
+- **Veer:** in reach of a nearest enemy that could answer, it tilts about 30 degrees off that enemy and keeps closing.
+  Two tanks locked head-on both hold fire and tilt; near 90 px the first to swing back in gets the shot.
 - **Friendly-fire veto:** any visible teammate on the line of fire or by the blast holds the shot, whichever enemy it was
   aimed at.
 - **Spacing:** on the approach it steers away from teammates inside about 22 px, just outside a blast, and back toward
   the nearest if it drifts past 30 px. Once an enemy is in range, spacing can only slow a tank with a teammate close ahead.
 
-It doesn't use the gun-ready input, because pulling the trigger while reloading does nothing. Battles are short and
-lethal: against itself, the last tank dies about 8 s in on average. `just cc-mirror` measures that.
+It doesn't use its own gun-ready input, because pulling the trigger while reloading does nothing. `just cc-mirror`
+measures how long battles against itself last.
 
 ## Fitness
 

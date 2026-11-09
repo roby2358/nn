@@ -43,6 +43,7 @@ COURSES_PER_GEN = 2       # every net flies these many courses; fitness is the m
 CROSSOVER_RATE = 0.25
 MUTATION_SIGMAS = (0.02, 0.06, 0.2)   # each child draws one: fine-tune, explore, leap
 GENS_PER_PRESS = 500
+SAVE_EVERY = 100          # headless evolution writes swarm and weights this often, in generations
 
 # ---- scripted autopilot -------------------------------------------------------------
 BOT_ARRIVE_SPEED = 140.0  # speed it aims to carry through a crystal

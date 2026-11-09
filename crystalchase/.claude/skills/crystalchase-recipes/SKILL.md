@@ -10,7 +10,7 @@ description: Project helper recipes for crystalchase (cc- prefixed justfile reci
   countdown) into the project root. Read the PNGs to check visuals. It uses `weights.npz` if present.
   The PNGs are gitignored.
 - `just evolve <gens>` (not cc-, but useful): headless evolution with one log line per generation.
-  Resumes from and saves `swarm.npz` + `weights.npz`.
+  Resumes from `swarm.npz` + `weights.npz`, and saves them every 100 generations and at the end.
 - `just cc-laps <n>`: flies the saved champion (`weights.npz`) solo on courses seeded 0..n-1 and prints
   per-lap crystals, score and crash time/position, then a summary. Use it to check whether the champion
   crashes or to compare champions.

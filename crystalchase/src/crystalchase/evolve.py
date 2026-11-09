@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import COURSES_PER_GEN, CROSSOVER_RATE, ELITES, MUTATION_SIGMAS, POP_SIZE
+from .config import COURSES_PER_GEN, CROSSOVER_RATE, ELITES, MUTATION_SIGMAS, POP_SIZE, SAVE_EVERY
 from .course import Course, make_course
 from .flock import Flock, solo_rule
 from .pilots import AutoPilot, Brains, Crew, Seat, random_genomes
@@ -193,7 +193,8 @@ class BackgroundEvolver(threading.Thread):
 
 
 def main() -> None:
-    """Headless evolution: `just evolve [gens]`. Resumes from swarm.npz / weights.npz if present."""
+    """Headless evolution: `just evolve [gens]`. Resumes from swarm.npz / weights.npz if present,
+    and saves them every SAVE_EVERY generations and at the end."""
     import sys
 
     gens = int(sys.argv[1])
@@ -205,6 +206,9 @@ def main() -> None:
         s = ev.step()
         print(f"gen {s.gen:5d}  best {s.best:6.2f} ({s.best_crystals:4.1f} crystals)  mean {s.mean:6.2f}  "
               f"bot {s.bot:6.2f}  crashed {s.crash_rate:4.0%}  {time.perf_counter() - t0:6.1f}s", flush=True)
+        if s.gen % SAVE_EVERY == 0:
+            ev.save(SWARM, WEIGHTS)
+            print(f"saved {SWARM} and {WEIGHTS}", flush=True)
     ev.save(SWARM, WEIGHTS)
     print(f"saved {SWARM} and {WEIGHTS}")
 

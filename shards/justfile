@@ -23,7 +23,7 @@ up:
 test:
     SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy {{python}} -m pytest -q
 
-# Evolve headless (works in the container); resumes from and saves swarm.npz + weights.npz
+# Evolve headless (works in the container); resumes from swarm.npz + weights.npz, saves them every 100 generations and at the end
 evolve gens:
     {{python}} -m shards.evolve {{gens}}
 

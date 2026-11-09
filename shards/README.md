@@ -62,7 +62,7 @@ The project dir is shared between container and host, so each side gets its own 
 just setup        # create this host's venv and install
 just test         # headless tests, fine inside the container
 just up           # launch the GUI, needs a display
-just evolve 300   # evolve headless, resumes from and saves swarm.npz + weights.npz
+just evolve 300   # evolve headless, resumes from swarm.npz + weights.npz, saves them every 100 generations and at the end
 just cc-stats weights.npz 100   # how a weights file plays on 100 fixed fields
 just cc-shot 6    # headless screenshots shot-watch.png / shot-fly.png, 6 s in
 just cc-calculated weights.npz   # build the hunter pilot without training

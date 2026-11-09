@@ -1,7 +1,10 @@
 """Nets, selection and persistence."""
 
+import sys
+
 import numpy as np
 
+from shards import evolve
 from shards.config import CMD_FIRE, CMD_THRUST, CMD_TURN, ELITES, N_INPUTS, POP_SIZE
 from shards.evolve import Evolver, evaluate, reproduce
 from shards.pilots import GENOME, Brains, random_genomes
@@ -15,6 +18,15 @@ def test_outputs_stay_in_their_ranges():
     assert (-1.0 <= out[:, CMD_TURN]).all() and (out[:, CMD_TURN] <= 1.0).all()
     squashed = out[:, [CMD_THRUST, CMD_FIRE]]
     assert (0.0 <= squashed).all() and (squashed <= 1.0).all()
+
+
+def test_headless_run_saves_along_the_way_and_at_the_end(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)                     # keeps the real swarm.npz and weights.npz out of it
+    monkeypatch.setattr(evolve, "SAVE_EVERY", 2)
+    monkeypatch.setattr(sys, "argv", ["evolve", "3"])
+    evolve.main()
+    assert capsys.readouterr().out.count("saved") == 2
+    assert (tmp_path / evolve.SWARM).exists() and (tmp_path / evolve.WEIGHTS).exists()
 
 
 def test_evaluate_is_repeatable_and_fair():

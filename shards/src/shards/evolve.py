@@ -11,7 +11,8 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import CROSSOVER_GENE_ODDS, CROSSOVER_RATE, ELITES, MUTATION_SIGMAS, POP_SIZE, RUN_STEPS, SCENARIOS_PER_GEN
+from .config import (CROSSOVER_GENE_ODDS, CROSSOVER_RATE, ELITES, MUTATION_SIGMAS, POP_SIZE, RUN_STEPS, SAVE_EVERY,
+                     SCENARIOS_PER_GEN)
 from .pilots import Brains, Pilot, random_genomes
 from .scenario import Scenario, make_scenario
 from .worlds import Worlds
@@ -179,7 +180,8 @@ class BackgroundEvolver(threading.Thread):
 
 
 def main() -> None:
-    """Headless evolution: `just evolve [gens]`. Resumes from swarm.npz / weights.npz if present."""
+    """Headless evolution: `just evolve [gens]`. Resumes from swarm.npz / weights.npz if present,
+    and saves them every SAVE_EVERY generations and at the end."""
     gens = int(sys.argv[1])
     ev = Evolver(int(time.time()))
     if SWARM.exists() or WEIGHTS.exists():
@@ -190,6 +192,9 @@ def main() -> None:
         print(f"gen {s.gen:5d}  best {s.best:6.2f} ({s.best_hits:5.1f} hits, {s.best_seconds:4.1f}s, "
               f"acc {s.best_accuracy:4.0%})  mean {s.mean:6.2f}  died {s.death_rate:4.0%}  "
               f"{time.perf_counter() - t0:6.1f}s", flush=True)
+        if s.gen % SAVE_EVERY == 0:
+            ev.save(SWARM, WEIGHTS)
+            print(f"saved {SWARM} and {WEIGHTS}", flush=True)
     ev.save(SWARM, WEIGHTS)
     print(f"saved {SWARM} and {WEIGHTS}")
 

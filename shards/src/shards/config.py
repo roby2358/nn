@@ -80,3 +80,4 @@ CROSSOVER_RATE = 0.25
 CROSSOVER_GENE_ODDS = 0.5  # a crossed child takes each weight from the second elite this often
 MUTATION_SIGMAS = (0.02, 0.06, 0.2)   # each child draws one: fine-tune, explore, leap
 GENS_PER_PRESS = 500
+SAVE_EVERY = 100          # headless evolution writes swarm and weights this often, in generations

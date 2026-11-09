@@ -13,7 +13,7 @@ import numpy as np
 
 from .config import (CLOSE, CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, COS, DT, FIELD, FIRE_ABOVE,
                      FRIENDLY_KILL_COST, GUN_COS, GUN_SIN, KILL_POINTS, LOADED, MAX_SPEED, MUZZLE_GAP, N_INPUTS, NEAR_MISS_POINTS, NEAR_MISS_R, NEAREST, N_OUTPUTS,
-                     RELOAD, SENSE_RANGE, SHELL_LIFE, SHELL_SPEED, SIN, SPLASH_R, SURVIVAL_POINTS, TANK_R,
+                     RELOAD, SENSE_RANGE, SHELL_LIFE, SHELL_SPEED, SIN, SPLASH_KILL_ODDS, SPLASH_R, SURVIVAL_POINTS, TANK_R,
                      TANKS, TEAM_SIZE, TURN_RATE)
 from .geometry import dot, length
 from .scenario import Scenario
@@ -34,6 +34,7 @@ class Worlds:
     def __init__(self, scenarios: list[Scenario], step_limit: float) -> None:
         w = len(scenarios)
         self.count = w
+        self.rng = np.random.default_rng([s.seed for s in scenarios])
         self.step_limit = step_limit
         self.pos = np.stack([s.spots for s in scenarios])
         self.ang = np.stack([s.headings for s in scenarios])
@@ -163,7 +164,8 @@ class Worlds:
 
     def _resolve_shells(self, expired: np.ndarray) -> None:
         """Every shell going off this step acts on the same live tanks, so two shells that
-        catch one tank both get the kill and neither depends on the order of the slots."""
+        catch one tank both get the kill and neither depends on the order of the slots.
+        A tank the shell touches dies. One it only splashes gets a roll, per shell."""
         active = expired | (self.shell_ttl > 0.0)
         reach = length(self.pos[:, None] - self.shell_pos[:, :, None])   # (W, shell, tank)
         alive = self.alive[:, None]
@@ -173,10 +175,11 @@ class Worlds:
         if not blown.any():
             return
         caught = (reach < SPLASH_R) & alive & blown[:, :, None]
-        killed_enemy = caught & ENEMY
+        killed = caught & ((reach < TANK_R) | (self.rng.random(caught.shape) < SPLASH_KILL_ODDS))
+        killed_enemy = killed & ENEMY
         self.kills += killed_enemy.sum(2)
-        self.friendly_kills += (caught & ~ENEMY).sum(2)
+        self.friendly_kills += (killed & ~ENEMY).sum(2)
         self.near_misses += blown & self.shell_near & ~killed_enemy.any(2)
-        self.alive &= ~caught.any(1)
+        self.alive &= ~killed.any(1)
         self.shell_ttl[blown] = 0.0
         self.blasts += [Blast(int(w), tuple(self.shell_pos[w, s])) for w, s in zip(*np.nonzero(blown))]

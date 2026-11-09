@@ -1,16 +1,19 @@
 """A charging tank built algebraically, with no training: `just cc-calculated <out.npz>`.
 
-The result is an ordinary genome in the 49 -> 48 -> 16 -> 3 net that evolution uses. The first hidden layer
+The result is an ordinary genome in the 49 -> 54 -> 17 -> 3 net that evolution uses. The first hidden layer
 cuts the inputs with sharp half-planes, the second ANDs them into facts, and the outputs weigh the facts.
 
 Shooting is (any enemy in the sights that can't answer) AND NOT (any teammate in the danger zone). An enemy can't
-answer if its gun is reloading, or if it points too far off this tank to swing back before the shell lands. Each
+answer if its gun is reloading, if it points too far off this tank to swing back before the shell lands, or if it's
+beyond the reach of a direct hit, where either tank's shell can only splash. Each
 visible enemy gets one AND unit and each visible teammate gets another. One line of sight is enough to fire, and because a single
 veto outweighs all four sights, one teammate is enough to hold. A shell only goes off on contact or at full
 range, so the sights are as wide as a tank up close, and the danger zone is as wide as a blast the whole way
 out. Bearing tolerance is an affine fit in closeness to the shape width / distance.
 
 Driving is a charge at the nearest enemy that stops short of the distance where a hit would catch the shooter.
+Only a pack charges: a tank with two teammates close by. Any other tank stops at firing range and shells from
+there, just past the reach of a direct hit. It holds its ground rather than backing away, because it can't see the edge.
 Turning is linear in the bearing, and the treads share one drive and one turn signal. A hard turn cancels the
 drive, so a tank spins in place until it's pointing roughly the right way and only then rolls.
 
@@ -31,11 +34,12 @@ from pathlib import Path
 import numpy as np
 
 from .config import (CLOSE, CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, COS, GUN_COS, LOADED, N_HIDDEN_1,
-                     N_HIDDEN_2, N_INPUTS, N_OUTPUTS, NEAREST, SELF_INPUTS, SENSE_RANGE, SHELL_RANGE, SHELL_SPEED, SIN,
-                     SPLASH_R, TURN_RATE)
+                     N_HIDDEN_2, N_INPUTS, N_OUTPUTS, NEAREST, SELF_INPUTS, SENSE_RANGE, SHELL_BURST, SHELL_SPEED, SIN,
+                     TANK_R, TURN_RATE)
 from .pilots import save_champion
 
 SHARP = 100.0           # how hard a first-layer half-plane switches
+RANGE_SHARP = 8.0       # steeper still on closeness for a range gate, which must tell apart distances a few px apart
 GATE = 5.0              # how hard a second-layer AND switches, on inputs of +-1
 LINEAR = 0.05           # small enough that tanh(LINEAR * x) is LINEAR * x, for a signal passing through a layer
 
@@ -44,7 +48,10 @@ SIGHT_FAR, SIGHT_FAR_TOL = 190.0, 0.02
 LINE_NEAR, LINE_NEAR_TOL = 45.0, 0.30        # the same for the teammate danger zone, wider than the sights
 LINE_FAR, LINE_FAR_TOL = 200.0, 0.075
 AHEAD_SLOPE = 0.5       # closes the zones behind the tank: costs nothing dead ahead and everything dead astern
-FIRE_RANGE = SHELL_RANGE + SPLASH_R          # px; beyond this a shell can't reach
+DIRECT_RANGE = SHELL_BURST + TANK_R          # px; beyond this a shell can't touch a tank, only splash it
+STANDOFF_RANGE = DIRECT_RANGE + 5.0          # px; a tank without a pack stops here, where only splash can reach it
+FIRE_RANGE = STANDOFF_RANGE + 3.0            # px; the longest shot, a little past the stand-off so that a stopped tank has it
+PACK_R = 80.0           # px; a tank whose second-nearest teammate is this close is in a pack of three
 FRIEND_REACH = FIRE_RANGE + 5.0
 MIN_RANGE = 25.0        # px; hold fire closer than this, because a hit would catch the shooter
 STOP_RANGE = 30.0       # px; the charge halts here and backs off inside it
@@ -77,10 +84,12 @@ AIM, RANGE, APPROACH, ASTERN = range(FRIEND_NEAR + NEAREST, FRIEND_NEAR + NEARES
 REPEL_POS, REPEL_NEG, BLOCK = (ASTERN + 1 + kind * NEAREST for kind in range(3))
 DRIFTED, HAS_FRIEND, FRIEND_SIDE = range(BLOCK + NEAREST, BLOCK + NEAREST + 3)
 CANT_ANSWER = FRIEND_SIDE + 1   # the first of NEAREST units
+BEYOND_DIRECT = CANT_ANSWER + NEAREST   # the first of NEAREST units
+STANDOFF, PACK = range(BEYOND_DIRECT + NEAREST, BEYOND_DIRECT + NEAREST + 2)
 
 # second hidden layer
 FIRE, VETO = 0, NEAREST     # the first of NEAREST units of each
-AIM_2, RANGE_2, KICK, SPACE_POS, SPACE_NEG, ATTRACT_POS, ATTRACT_NEG, BLOCKED = range(2 * NEAREST, N_HIDDEN_2)
+AIM_2, RANGE_2, KICK, SPACE_POS, SPACE_NEG, ATTRACT_POS, ATTRACT_NEG, BLOCKED, HOLD = range(2 * NEAREST, N_HIDDEN_2)
 
 
 def closeness(px: float) -> float:
@@ -123,6 +132,10 @@ class Wiring:
             self.w1[source, unit] = SHARP * weight
         self.b1[unit] = SHARP * offset
 
+    def range_gate(self, unit: int, close: int, px: float, sign: float) -> None:
+        """First-layer unit, +1 for a contact nearer than px (sign 1.0) or farther than it (sign -1.0)."""
+        self.plane(unit, {close: sign * RANGE_SHARP}, -sign * RANGE_SHARP * closeness(px))
+
     def bearing_window(self, left: int, right: int, sin: int, cos: int, close: int,
                        shape: tuple[float, float]) -> None:
         """Two units, both +1 when a contact's |sin| is under the tolerance `shape` allows and it's ahead."""
@@ -135,6 +148,12 @@ class Wiring:
         for source, sign in sources:
             self.w2[source, unit] = GATE * sign
         self.b2[unit] = -GATE * (len(sources) - 1)
+
+    def all_and_either(self, unit: int, sources: list[int], either: tuple[int, int]) -> None:
+        """Second-layer unit, +1 only when every source is +1 and at least one of `either` is too."""
+        self.w2[sources, unit] = 2.0 * GATE
+        self.w2[list(either), unit] = GATE
+        self.b2[unit] = -GATE * (2.0 * len(sources) - 1.0)
 
     def relay(self, source: int, unit: int) -> None:
         """Carry a first-layer signal through the second layer unchanged but for scale LINEAR."""
@@ -157,11 +176,12 @@ def wire_shooting(net: Wiring) -> None:
     net.plane(NOT_POINT_BLANK, {enemy(0, CLOSE): -1.0}, closeness(MIN_RANGE))
     for k in range(NEAREST):
         net.bearing_window(SIGHT_L + k, SIGHT_R + k, enemy(k, SIN), enemy(k, COS), enemy(k, CLOSE), sights)
-        net.plane(REACH + k, {enemy(k, CLOSE): 1.0}, -closeness(FIRE_RANGE))
+        net.range_gate(REACH + k, enemy(k, CLOSE), FIRE_RANGE, 1.0)
         net.plane(CANT_ANSWER + k, {enemy(k, GUN_COS): -1.0, enemy(k, CLOSE): answer_slope,
                                     enemy(k, LOADED): -UNLOADED_MARGIN}, answer_intercept + UNLOADED_MARGIN)
-        net.all_of(FIRE + k, [(SIGHT_L + k, 1.0), (SIGHT_R + k, 1.0), (REACH + k, 1.0), (NOT_POINT_BLANK, 1.0),
-                              (CANT_ANSWER + k, 1.0)])
+        net.range_gate(BEYOND_DIRECT + k, enemy(k, CLOSE), DIRECT_RANGE, -1.0)
+        net.all_and_either(FIRE + k, [SIGHT_L + k, SIGHT_R + k, REACH + k, NOT_POINT_BLANK],
+                           (CANT_ANSWER + k, BEYOND_DIRECT + k))
     for j in range(NEAREST):
         net.bearing_window(LINE_L + j, LINE_R + j, friend(j, SIN), friend(j, COS), friend(j, CLOSE), line)
         net.plane(FRIEND_NEAR + j, {friend(j, CLOSE): 1.0}, -closeness(FRIEND_REACH))
@@ -182,16 +202,26 @@ def wire_charge(net: Wiring) -> None:
 
     net.plane(ASTERN, {enemy(0, COS): -1.0}, ASTERN_COS)
     wire_kick(net)
+    wire_hold(net)
 
 
 def wire_kick(net: Wiring) -> None:
-    """One unit for a fixed turn: enemy astern, OR (nearest enemy in reach AND it could answer)."""
+    """One unit for a fixed turn: enemy astern, OR (nearest enemy in direct reach AND it could answer)."""
     net.w2[ASTERN, KICK] = 2.0 * GATE
-    net.w2[REACH, KICK] = GATE
+    net.w2[BEYOND_DIRECT, KICK] = -GATE
     net.w2[CANT_ANSWER, KICK] = -GATE
     net.b2[KICK] = GATE
     net.treads(KICK, 0.0, KICK_TURN / 2.0)
     net.tread_bias(0.0, KICK_TURN / 2.0)
+
+
+def wire_hold(net: Wiring) -> None:
+    """Without a pack, the nearest enemy being inside the stand-off cancels the charge's drive, and nothing more."""
+    net.range_gate(STANDOFF, enemy(0, CLOSE), STANDOFF_RANGE, 1.0)
+    net.plane(PACK, {friend(1, CLOSE): 1.0}, -closeness(PACK_R))
+    net.all_of(HOLD, [(PACK, -1.0), (STANDOFF, 1.0)])
+    net.treads(HOLD, -DRIVE / 2.0, 0.0)
+    net.tread_bias(-DRIVE / 2.0, 0.0)
 
 
 def wire_spacing(net: Wiring) -> None:

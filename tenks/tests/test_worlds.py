@@ -8,7 +8,7 @@ import pytest
 from tenks.config import (CLOSE, CONTACT_INPUTS, COS, DT, FIELD, FIELD_W, GUN_COS, GUN_SIN, LOADED, MAX_SPEED, N_INPUTS, N_OUTPUTS, NEAREST, RELOAD,
                           SELF_INPUTS,
                           SENSE_RANGE, SHELL_RANGE, SHELL_SPEED, SIN, SPAWN_HALF_BAND, SPAWN_LINE, SPAWN_MARGIN,
-                          SPLASH_R, SURVIVAL_POINTS, TANK_R, TANKS, TURN_RATE)
+                          SHELL_BURST, SPLASH_KILL_ODDS, SPLASH_R, SURVIVAL_POINTS, TANK_R, TANKS, TURN_RATE)
 from tenks.geometry import length
 from tenks.scenario import Scenario, make_scenario
 from tenks.worlds import Worlds
@@ -18,6 +18,19 @@ ENEMY_BLOCK = SELF_INPUTS
 FRIEND_BLOCK = SELF_INPUTS + NEAREST * CONTACT_INPUTS
 FAR_GREEN, FAR_BLUE = 7, 15
 FAR_SPOTS = {FAR_GREEN: (40.0, 40.0, 0.0), FAR_BLUE: (40.0, 680.0, 0.0)}
+
+
+class Dice:
+    """Stands in for the world's generator, so that a test can decide how a splash roll comes out."""
+
+    def __init__(self, roll: float) -> None:
+        self.roll = roll
+
+    def random(self, shape: tuple) -> np.ndarray:
+        return np.full(shape, self.roll)
+
+
+SPLASH_KILLS, SPLASH_SPARES = Dice(0.0), Dice(1.0)
 
 
 def arena(tanks: dict[int, tuple[float, float, float]]) -> Worlds:
@@ -145,9 +158,57 @@ def test_a_direct_hit_kills_outright_and_credits_the_owner():
     assert w.near_misses[0, GREEN_A] == 0
 
 
+def test_a_direct_hit_ignores_the_splash_roll():
+    w = arena({GREEN_A: (100.0, 300.0, 0.0), BLUE_A: (200.0, 300.0, 0.0)})
+    w.rng = SPLASH_SPARES
+    fire_once(w, GREEN_A, 0.5)
+    assert not w.alive[0, BLUE_A]
+
+
+def test_a_failed_splash_roll_spares_the_tank_and_counts_as_a_near_miss():
+    w = arena({GREEN_A: (100.0, 300.0, 0.0), BLUE_A: (100.0 + SHELL_BURST, 300.0 + TANK_R + 2.0, 0.0)})
+    w.rng = SPLASH_SPARES
+    fire_once(w, GREEN_A, 0.5)
+    assert w.alive[0, BLUE_A] and w.kills[0, GREEN_A] == 0
+    assert w.near_misses[0, GREEN_A] == 1
+
+
+def many_splashed(seeds: range) -> Worlds:
+    """Every world holds one shell that will run out beside a parked tank, never touching it."""
+    spots, headings = np.zeros((TANKS, 2)), np.zeros(TANKS)
+    spots[GREEN_A], spots[BLUE_A] = (100.0, 300.0), (100.0 + SHELL_BURST, 300.0 + TANK_R + 2.0)
+    worlds = Worlds([Scenario(seed, spots, headings) for seed in seeds], 10 ** 6)
+    worlds.alive[:] = False
+    worlds.alive[:, [GREEN_A, BLUE_A, FAR_GREEN, FAR_BLUE]] = True
+    worlds.pos[:, FAR_GREEN], worlds.pos[:, FAR_BLUE] = (40.0, 40.0), (40.0, 680.0)
+    fire = np.tile(orders(t0=(0.0, 0.0, 1.0)), (len(seeds), 1))
+    worlds.step(fire)
+    for _ in range(round(0.5 / DT)):
+        worlds.step(fire * 0.0)
+    return worlds
+
+
+def test_a_splash_kills_with_the_stated_odds():
+    worlds = many_splashed(range(2000))
+    assert (~worlds.alive[:, BLUE_A]).mean() == pytest.approx(SPLASH_KILL_ODDS, abs=0.05)
+
+
+def test_the_splash_rolls_repeat_for_the_same_seeds():
+    assert np.array_equal(many_splashed(range(50)).alive, many_splashed(range(50)).alive)
+
+
+def test_a_shell_runs_out_at_its_burst_distance():
+    w = arena({GREEN_A: (100.0, 300.0, 0.0)})
+    w.step(orders(t0=(0.0, 0.0, 1.0)))
+    while not w.blasts:
+        w.step(orders())
+    assert w.blasts[0].pos == pytest.approx((100.0 + SHELL_BURST, 300.0))
+
+
 def test_splash_kills_every_tank_in_the_radius_and_spares_those_outside():
     w = arena({GREEN_A: (100.0, 300.0, 0.0), BLUE_A: (200.0, 300.0, 0.0),
                BLUE_B: (200.0, 300.0 + SPLASH_R - 6.0, 0.0), 10: (200.0, 300.0 + SPLASH_R + 30.0, 0.0)})
+    w.rng = SPLASH_KILLS
     fire_once(w, GREEN_A, 0.5)
     assert not w.alive[0, BLUE_A] and not w.alive[0, BLUE_B] and w.alive[0, 10]
     assert w.kills[0, GREEN_A] == 2
@@ -155,6 +216,7 @@ def test_splash_kills_every_tank_in_the_radius_and_spares_those_outside():
 
 def test_a_shell_goes_off_at_full_range():
     w = arena({GREEN_A: (100.0, 300.0, 0.0), BLUE_A: (100.0 + TANK_R + SHELL_RANGE + 7.0, 300.0 + TANK_R + 2.0, 0.0)})
+    w.rng = SPLASH_KILLS
     fire_once(w, GREEN_A, 0.5)
     assert not w.alive[0, BLUE_A]     # never touched, but inside the blast where the shell ran out
 
@@ -168,6 +230,7 @@ def test_splash_kills_teammates_and_costs_the_shooter():
 
 def test_point_blank_splash_kills_the_shooter_too():
     w = arena({GREEN_A: (100.0, 300.0, 0.0), BLUE_A: (100.0 + 2.0 * TANK_R + 0.5, 300.0, 0.0)})
+    w.rng = SPLASH_KILLS
     fire_once(w, GREEN_A, 0.1)
     assert not w.alive[0, GREEN_A] and not w.alive[0, BLUE_A]
     assert (w.kills[0, GREEN_A], w.friendly_kills[0, GREEN_A]) == (1, 1)

@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from tenks.calculated import MIN_RANGE, STOP_RANGE, VEER_DEGREES, charger, closeness
+from tenks.calculated import DIRECT_RANGE, MIN_RANGE, PACK_R, STANDOFF_RANGE, STOP_RANGE, VEER_DEGREES, charger, closeness
 from tenks.config import (CLOSE, CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, FIRE_ABOVE, GUN_COS, GUN_SIN, LOADED,
                           N_INPUTS, NEAREST, RUN_STEPS, SELF_INPUTS, SENSE_RANGE, TANKS)
 from tenks.pilots import GENOME, Brains
@@ -13,6 +13,7 @@ from tenks.scenario import Scenario
 from tenks.worlds import Worlds
 
 Contact = tuple[float, float]    # degrees off the nose (positive is the +sin side), px away
+PACK_MATES = [(120.0, 40.0), (-120.0, 40.0)]     # behind the tank, and close enough to make it a pack
 
 
 def view(enemies: list[Contact], friends: list[Contact]) -> np.ndarray:
@@ -109,9 +110,9 @@ def test_charges_and_steers_at_an_enemy_too_far_away_to_register_closeness(net):
 
 
 def test_stops_short_and_backs_off_inside_the_stop_distance(net):
-    out = command(net, [(0.0, STOP_RANGE)], [])
+    out = command(net, [(0.0, STOP_RANGE)], PACK_MATES)
     assert abs(out[CMD_LEFT]) < 0.1 and abs(out[CMD_RIGHT]) < 0.1
-    out = command(net, [(0.0, STOP_RANGE - 7.5)], [])
+    out = command(net, [(0.0, STOP_RANGE - 7.5)], PACK_MATES)
     assert out[CMD_LEFT] < -0.3 and out[CMD_RIGHT] < -0.3
 
 
@@ -169,21 +170,50 @@ def test_no_veer_when_it_cannot_answer_or_is_out_of_reach(net, px, gun_off, load
     assert turn(facing(net, 0.0, px, gun_off, loaded)) == pytest.approx(0.0, abs=0.05)
 
 
-@pytest.mark.parametrize("nudge", [0.002, -0.01, 0.05, 0.2])
-def test_two_tanks_meeting_head_on_do_not_both_die(nudge):
+def test_without_a_pack_it_holds_at_the_stand_off_without_backing_away(net):
+    for px in (STANDOFF_RANGE - 3.0, 120.0):
+        out = command(net, [(0.0, px)], [])
+        assert abs(out[CMD_LEFT]) < 0.1 and abs(out[CMD_RIGHT]) < 0.1
+
+
+def test_without_a_pack_it_still_closes_to_the_stand_off(net):
+    out = command(net, [(0.0, STANDOFF_RANGE + 10.0)], [])
+    assert out[CMD_LEFT] > 0.8 and out[CMD_RIGHT] > 0.8
+
+
+def test_a_pack_charges_inside_the_stand_off(net):
+    out = command(net, [(0.0, 120.0)], PACK_MATES)
+    assert out[CMD_LEFT] > 0.8 and out[CMD_RIGHT] > 0.8
+
+
+@pytest.mark.parametrize("friends", [[(120.0, 40.0)], [(120.0, 40.0), (-120.0, PACK_R + 10.0)]])
+def test_one_teammate_nearby_is_not_a_pack(net, friends):
+    assert abs(command(net, [(0.0, 120.0)], friends)[CMD_LEFT]) < 0.1
+
+
+def test_fires_on_a_loaded_gun_aimed_back_from_beyond_a_direct_hit(net):
+    assert fires(facing(net, 0.0, DIRECT_RANGE + 3.0, 0.0, True))
+
+
+def test_no_veer_beyond_a_direct_hit(net):
+    assert turn(facing(net, 0.0, DIRECT_RANGE + 3.0, 0.0, True)) == pytest.approx(0.0, abs=0.05)
+
+
+def test_two_lone_tanks_stand_off_and_shell_each_other():
     spots, headings = np.zeros((TANKS, 2)), np.zeros(TANKS)
-    spots[0], spots[8] = (200.0, 360.0), (520.0, 360.0 + 40.0 * nudge)
-    headings[0], headings[8] = nudge, math.pi
+    spots[0], spots[8] = (200.0, 360.0), (520.0, 360.0)
+    headings[8] = math.pi
     worlds = Worlds([Scenario(0, spots, headings)], RUN_STEPS)
     worlds.alive[0] = False
     worlds.alive[0, [0, 8]] = True
     brains = Brains(np.tile(charger(), (TANKS, 1)))
     while not worlds.done and not worlds.over[0]:
+        assert np.linalg.norm(worlds.pos[0, 0] - worlds.pos[0, 8]) > DIRECT_RANGE
         worlds.step(brains.act(worlds.observe()))
-    assert worlds.alive[0].sum() == 1
+    assert worlds.over[0] and worlds.fired[0].sum() >= 2
 
 
 def test_a_teammate_close_ahead_slows_the_tank(net):
-    clear = command(net, [(0.0, 150.0)], [])
-    blocked = command(net, [(0.0, 150.0)], [(10.0, 15.0)])
+    clear = command(net, [(0.0, 150.0)], PACK_MATES)
+    blocked = command(net, [(0.0, 150.0)], [(10.0, 15.0), *PACK_MATES])
     assert blocked[CMD_LEFT] < clear[CMD_LEFT] - 0.3

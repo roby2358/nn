@@ -22,7 +22,7 @@ The battlefield is on the left. On the right are the controls and a live chart:
   2 s.
 - **Shells:** they fly at 450 px/s for 180 px, a quarter of the field. A shell goes off when it touches any live tank or
   reaches full range.
-- **Blast:** every tank within 15 px of the detonation dies outright. That includes teammates and the shooter.
+- **Blast:** a tank the shell touches dies. Any other tank within 15 px of the detonation has a 1-in-3 chance of dying. That includes teammates and the shooter.
 - **Tanks** block each other and wrecks don't block anything.
 - **Edge:** the field doesn't wrap. A tank whose center crosses the edge blows up, even if another tank shoved it there.
   Only that tank dies and nobody gets credit. Shells fly on past the edge until they run out of range.
@@ -34,20 +34,21 @@ The battlefield is on the left. On the right are the controls and a live chart:
   its bearing in the tank's own frame (sin, cos), its closeness, how far its gun points off this tank (sin, cos, where
   cos 1 is aimed straight at it), and whether its gun is ready. An absent contact is zeros. The net doesn't see shells
   or the edge of the field.
-- **Net:** two tanh hidden layers of 48 and 16 units, then left tread, right tread and shoot.
-- **Genome:** 3,235 weights, evolved without gradients.
+- **Net:** two tanh hidden layers of 54 and 17 units, then left tread, right tread and shoot.
+- **Genome:** 3,689 weights, evolved without gradients.
 
 ## The calculated tank
 
 `just cc-calculated <out.npz>` builds a tank with no training and writes it as an ordinary genome in the same
-49 -> 48 -> 16 -> 3 net. It uses all 48 first-layer units and all 16 of the second-layer units. Write it to
+49 -> 54 -> 17 -> 3 net. It uses all 54 first-layer units and all 17 of the second-layer units. Write it to
 `weights.npz` with no `swarm.npz` beside it and `just up` puts it in every tank.
 
-- **Charge:** it turns at the nearest enemy and drives in, stopping 30 px short and backing off if the enemy gets closer.
+- **Charge:** in a pack of three or more (two teammates within 80 px) it turns at the nearest enemy and drives in, stopping 30 px short and backing off if the enemy gets closer.
+- **Hang back:** without a pack it stops at about 197 px, just past the reach of a direct hit, and shells from there.
 - **Fire:** it shoots when any of the four visible enemies is in the sights, within reach and unable to answer: its gun
-  is reloading, or points too far off to swing back before the shell lands. It never fires with the
+  is reloading, points too far off to swing back before the shell lands, or is beyond the reach of a direct hit. It never fires with the
   nearest enemy inside 25 px, where a hit would catch the shooter too.
-- **Veer:** in reach of a nearest enemy that could answer, it tilts about 30 degrees off that enemy and keeps closing.
+- **Veer:** in direct reach of a nearest enemy that could answer, it tilts about 30 degrees off that enemy and keeps closing.
   Two tanks locked head-on both hold fire and tilt; near 90 px the first to swing back in gets the shot.
 - **Friendly-fire veto:** any visible teammate on the line of fire or by the blast holds the shot, whichever enemy it was
   aimed at.

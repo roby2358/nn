@@ -34,9 +34,11 @@ RELOAD = 2.0              # seconds between shots
 FIRE_ABOVE = 0.5          # the shoot command pulls the trigger above this
 SHELL_SPEED = 450.0
 SHELL_RANGE = FIELD_W / 4
-SHELL_LIFE = SHELL_RANGE / SHELL_SPEED
+SHELL_LIFE = SHELL_RANGE / SHELL_SPEED - DT / 2.0   # half a step short, so that rounding can't add a step of flight
 MUZZLE_GAP = 2.0          # a new shell starts this far outside its own hull
-SPLASH_R = 15.0           # every tank this close to a detonation dies
+SHELL_BURST = TANK_R + MUZZLE_GAP + SHELL_RANGE   # px from the shooter's centre to a shell going off at full range
+SPLASH_R = 15.0           # a tank this close to a detonation, but not touched by the shell, may die
+SPLASH_KILL_ODDS = 1.0 / 3.0
 NEAR_MISS_R = 60.0        # a shell that came this close to an enemy and killed none is a near miss
 
 # ---- scoring, per tank ------------------------------------------------------------
@@ -55,8 +57,8 @@ N_INPUTS = SELF_INPUTS + 2 * NEAREST * CONTACT_INPUTS
 SENSE_RANGE = FIELD_W / 2
 
 # ---- net: left tread -1..1, right tread -1..1, shoot 0..1 --------------------------
-N_HIDDEN_1 = 48
-N_HIDDEN_2 = 16
+N_HIDDEN_1 = 54
+N_HIDDEN_2 = 17
 N_OUTPUTS = 3
 CMD_LEFT, CMD_RIGHT, CMD_SHOOT = range(N_OUTPUTS)
 

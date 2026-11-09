@@ -30,7 +30,7 @@ def random_genomes(rng: np.random.Generator, n: int) -> np.ndarray:
 
 
 class Brains:
-    """A batch of nets, one per ship: inputs -> tanh hidden -> turn (tanh), thrust and fire
+    """A batch of nets, one per ship: inputs -> tanh hidden -> turn and moods (tanh), thrust and fire
     (squashed to 0..1). Each row of `genomes` is one flat net, so evolution can treat it as a vector."""
 
     def __init__(self, genomes: np.ndarray) -> None:

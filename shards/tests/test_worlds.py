@@ -2,9 +2,10 @@
 
 import numpy as np
 
-from shards.config import (BIG, CMD_FIRE, CMD_THRUST, CMD_TURN, COOLDOWN, DT, FIELD, FIELD_W, MAX_SPEED, N_INPUTS,
-                           N_OUTPUTS, POINTS, ROCK_COS, ROCK_SIN, ROCK_SLOTS, RUN_STEPS, SHIP_R, SHOT_COST, SHOT_LIFE,
-                           SHOT_SLOTS, SPAWN_CLEAR, SURVIVAL_POINTS, WAVE_BASE, WAVE_MAX, FREE_PLAY_STEPS, rock_input)
+from shards.config import (CMD_PASSION, PASSION, BIG, CMD_FIRE, CMD_THRUST, CMD_TURN, COOLDOWN, DT, FIELD, FIELD_W,
+                           MAX_SPEED, N_INPUTS, N_OUTPUTS, POINTS, ROCK_COS, ROCK_SIN, ROCK_SLOTS, RUN_STEPS, SHIP_R,
+                           SHOT_COST, SHOT_LIFE, SHOT_SLOTS, SPAWN_CLEAR, SURVIVAL_POINTS, WAVE_BASE, WAVE_MAX,
+                           FREE_PLAY_STEPS, rock_input)
 from shards.scenario import make_scenario
 from shards.worlds import Worlds, shortest
 
@@ -38,6 +39,15 @@ def empty_but_one_rock(w: Worlds, pos: tuple, size: int) -> None:
 
 def aim_at_right(w: Worlds) -> None:
     w.ang[0] = 0.0
+
+
+def test_moods_come_back_as_inputs_on_the_next_step():
+    w = world_of_one()
+    command = IDLE.copy()
+    command[0, CMD_PASSION:] = 0.25, -0.75
+    assert np.array_equal(w.observe()[0, PASSION:], [0.0, 0.0])
+    w.step(command)
+    assert np.array_equal(w.observe()[0, PASSION:], [0.25, -0.75])
 
 
 def test_first_wave_keeps_clear_of_the_ship():

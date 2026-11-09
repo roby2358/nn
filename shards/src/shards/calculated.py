@@ -1,8 +1,7 @@
 """A hunter pilot built algebraically, with no training: `just cc-calculated <out.npz>`.
 
 It leads the nearest rock and fires only when the shot would land, and moves by reading a danger
-field. The result is an ordinary Brains genome, the same 27 -> 24 -> 3 net that evolution uses, so
-the spare hidden units are zeros.
+field that two moods bend. The result is an ordinary Brains genome, the same net that evolution uses.
 
 For a target at bearing b with sideways relative speed v, the shot that intercepts it leaves at
 sin(aim) = v / SHOT_SPEED, whatever the distance. So near the target the aiming error is linear in
@@ -15,6 +14,12 @@ says the rock blocks the space ahead, the other that it threatens from behind. T
 balance: advance while nothing blocks the way and the ship is under cruising speed, ease off to a
 trickle when something does, and burn away when danger behind outweighs danger ahead. A left/right pair per
 rock turns away from a close rock, outweighing the aim.
+
+The two moods are outputs that come back as inputs on the next step, the net's only memory. Each has
+one hidden unit carrying it into its own next value. Passion rises with the rocks inside the stand-off
+and fades, and at full passion the stand-off is PASSION_CLEAR wider. Patience rises while the field is quiet
+and drains with rocks inside the stand-off, and takes up to PATIENCE_CLOSE_IN off it: with no danger
+about, the ship closes in.
 """
 
 import sys
@@ -22,15 +27,16 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import (CMD_FIRE, CMD_THRUST, CMD_TURN, N_HIDDEN, N_INPUTS, N_OUTPUTS, NEAREST, ROCK_CLOSE, ROCK_COS,
-                     ROCK_RADIUS, ROCK_SIN, ROCK_V_FORWARD, ROCK_V_SIDEWAYS, SENSE_RANGE, SHOT_SPEED, SPEED_SCALE,
-                     V_FORWARD, rock_input)
+from .config import (CMD_FIRE, CMD_PASSION, CMD_PATIENCE, CMD_THRUST, CMD_TURN, N_HIDDEN, N_INPUTS, N_OUTPUTS, NEAREST,
+                     ROCK_CLOSE, ROCK_COS, ROCK_RADIUS, ROCK_SIN, ROCK_V_FORWARD, ROCK_V_SIDEWAYS, SENSE_RANGE,
+                     SHOT_SPEED, SPEED_SCALE, PASSION, PATIENCE, V_FORWARD, rock_input)
 from .pilots import Brains
 
 SIN, COS, CLOSE = (rock_input(0, field) for field in (ROCK_SIN, ROCK_COS, ROCK_CLOSE))
 V_SIDE, SIZE = (rock_input(0, field) for field in (ROCK_V_SIDEWAYS, ROCK_RADIUS))
 ERROR, UNDER, OVER, AHEAD, IN_RANGE, CRUISING = range(6)   # the hidden units not tied to one rock of the field
 BLOCKED, CHASED, DODGE_POS, DODGE_NEG = (6 + kind * NEAREST for kind in range(4))   # first of NEAREST units of each
+PASSION_MEMORY, PATIENCE_MEMORY = 6 + 4 * NEAREST, 7 + 4 * NEAREST   # each carries a mood into its own next value
 
 LEAD = SPEED_SCALE / SHOT_SPEED
 LINEAR = 0.05           # small enough that tanh(LINEAR * x) is LINEAR * x
@@ -44,7 +50,7 @@ TOL_SIZE = 0.05
 FIRE_BIAS = -3.5        # four units at +1 clear this; any one at -1 does not
 
 LOOK_AHEAD = 1.5        # seconds; a moving rock counts from where it will be this much later
-CLEAR_AHEAD = 260.0     # px of clear space a rock dead ahead must leave for the way to count as open
+CLEAR_AHEAD = 160.0     # px of clear space a rock dead ahead must leave for the way to count as open, when calm
 BLOCK_SLANT = 0.1       # how much less a rock counts as blocking per unit of bearing away from dead ahead
 DANGER = 60.0           # px of clear space at which a rock abeam counts as a threat
 CHASE_SLANT = 0.15      # how much sooner a rock behind is a threat, and later one ahead
@@ -53,6 +59,14 @@ OPEN_WEIGHT = 3.0       # what an open way, or cruising speed, says to thrust
 BLOCK_WEIGHT = 2.0      # one blocking rock cuts an open way's thrust to a trickle
 CHASE_WEIGHT = 4.0      # one threat behind outweighs one rock blocking the way
 DODGE_WEIGHT = 8.0      # one dodge pair outvotes the aiming error
+
+PASSION_HOLD = 0.99        # how much passion carries over per step
+PASSION_RISE = 0.1         # passion added per step for each rock inside the stand-off
+PASSION_CLEAR = 130.0      # px added to the stand-off at full passion
+
+PATIENCE_HOLD = 1.0     # how much patience carries over per step
+PATIENCE_RATE = 0.01    # patience gained per step in a quiet field, and twice that lost per rock inside the stand-off
+PATIENCE_CLOSE_IN = 65.0  # px taken off the stand-off at full patience, and added at none
 
 LOOK = LOOK_AHEAD * SPEED_SCALE / SENSE_RANGE   # closeness gained per unit of the speed input
 CLEAR_CLOSE = 1.0 - CLEAR_AHEAD / SENSE_RANGE
@@ -93,6 +107,19 @@ def _dodges(w1: np.ndarray, b1: np.ndarray, w2: np.ndarray) -> None:
             w2[first + rock, CMD_TURN] = -side * DODGE_WEIGHT     # the pair cancels while both are off
 
 
+def _moods(w1: np.ndarray, b1: np.ndarray, w2: np.ndarray, b2: np.ndarray) -> None:
+    """Passion, charged by rocks inside the stand-off, widens the stand-off. Patience, charged by a quiet
+    field and drained by rocks inside the stand-off, narrows it: with no danger about, the ship closes in."""
+    w1[PASSION, PASSION_MEMORY], w1[PATIENCE, PATIENCE_MEMORY] = LINEAR, LINEAR
+    w2[PASSION_MEMORY, CMD_PASSION], w2[PATIENCE_MEMORY, CMD_PATIENCE] = PASSION_HOLD / LINEAR, PATIENCE_HOLD / LINEAR
+    w1[PASSION, BLOCKED:BLOCKED + NEAREST] = SHARP * PASSION_CLEAR / SENSE_RANGE
+    w1[PATIENCE, BLOCKED:BLOCKED + NEAREST] = -SHARP * PATIENCE_CLOSE_IN / SENSE_RANGE
+    w2[BLOCKED:BLOCKED + NEAREST, CMD_PASSION] = PASSION_RISE / 2.0       # a unit at -1 cancels the bias
+    b2[CMD_PASSION] = NEAREST * PASSION_RISE / 2.0
+    w2[BLOCKED:BLOCKED + NEAREST, CMD_PATIENCE] = -PATIENCE_RATE    # all at -1 leaves +rate
+    b2[CMD_PATIENCE] = -(NEAREST - 1) * PATIENCE_RATE
+
+
 def hunter() -> Brains:
     w1, b1 = np.zeros((N_INPUTS, N_HIDDEN)), np.zeros(N_HIDDEN)
     w2, b2 = np.zeros((N_HIDDEN, N_OUTPUTS)), np.zeros(N_OUTPUTS)
@@ -114,6 +141,7 @@ def hunter() -> Brains:
 
     _danger_field(w1, b1, w2)
     _dodges(w1, b1, w2)
+    _moods(w1, b1, w2, b2)
     return Brains(np.concatenate([w1.ravel(), b1, w2.ravel(), b2])[None, :])
 
 

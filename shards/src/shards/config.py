@@ -52,18 +52,21 @@ SHOT_COST = 0.5           # fitness lost per shot fired, so a shot has to be lik
 NEAREST = 4               # rocks the net can see, closest surface first
 ROCK_INPUTS = 6           # sin bearing, cos bearing, closeness, v forward, v sideways, radius
 SELF_INPUTS = 3           # v forward, v sideways, gun ready
-N_INPUTS = SELF_INPUTS + NEAREST * ROCK_INPUTS
+N_MOODS = 2               # outputs that come back as inputs on the next step: the net's only memory
+N_INPUTS = SELF_INPUTS + NEAREST * ROCK_INPUTS + N_MOODS
 SENSE_RANGE = 500.0
 SPEED_SCALE = 300.0
 RADIUS_SCALE = 22.0
 
-# ---- net: turn in -1..1, thrust in 0..1, fire in 0..1 -----------------------------
+# ---- net: turn in -1..1, thrust in 0..1, fire in 0..1, and the moods in -1..1 ------
 N_HIDDEN = 24
-N_OUTPUTS = 3
-CMD_TURN, CMD_THRUST, CMD_FIRE = range(N_OUTPUTS)
+N_OUTPUTS = 3 + N_MOODS
+CMD_TURN, CMD_THRUST, CMD_FIRE, CMD_PASSION, CMD_PATIENCE = range(N_OUTPUTS)
 
 # ---- input layout: the ship's own values, then NEAREST rocks of ROCK_INPUTS values each
 V_FORWARD, V_SIDEWAYS, GUN_READY = range(SELF_INPUTS)
+PASSION, PATIENCE = range(N_INPUTS - N_MOODS, N_INPUTS)
+MOOD_PASSION, MOOD_PATIENCE = range(N_MOODS)    # columns of Worlds.mood
 ROCK_SIN, ROCK_COS, ROCK_CLOSE, ROCK_V_FORWARD, ROCK_V_SIDEWAYS, ROCK_RADIUS = range(ROCK_INPUTS)
 
 

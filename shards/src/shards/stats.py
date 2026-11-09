@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import CMD_FIRE, CMD_THRUST, CMD_TURN, FIRE_ABOVE, RUN_STEPS
+from .config import CMD_FIRE, CMD_PASSION, CMD_PATIENCE, CMD_THRUST, CMD_TURN, FIRE_ABOVE, RUN_STEPS
 from .evolve import accuracy, fly
 from .pilots import Brains
 from .scenario import make_scenario
@@ -44,6 +44,9 @@ def main() -> None:
     print(f"  turn       mean |turn| {np.abs(turn).mean():4.2f}   mean signed {turn.mean():+5.2f}")
     print(f"  thrust     mean {thrust.mean():4.2f}")
     print(f"  trigger    held {(fire > FIRE_ABOVE).mean():4.0%} of the time")
+    for name, mood in (("passion", CMD_PASSION), ("patience", CMD_PATIENCE)):
+        low, mid, high = np.percentile(commands[:, mood], [10, 50, 90])
+        print(f"  {name:10s} 10th {low:+5.2f}   median {mid:+5.2f}   90th {high:+5.2f}")
 
 
 if __name__ == "__main__":

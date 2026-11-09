@@ -11,11 +11,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .config import (BIG, CMD_FIRE, CMD_THRUST, CMD_TURN, COOLDOWN, DRAG, DRIFT_TABLE, DT, FIELD, FIRE_ABOVE, GUN_READY,
-                     MAX_SPEED, NEAREST, POINTS, RADIUS, RADIUS_SCALE, ROCK_CLOSE, ROCK_COS, ROCK_INPUTS, ROCK_RADIUS,
-                     ROCK_SIN, ROCK_SLOTS, ROCK_V_FORWARD, ROCK_V_SIDEWAYS, SELF_INPUTS, SENSE_RANGE, SHIP_R,
-                     SHOT_COST, SHOT_LIFE, SHOT_SLOTS, SHOT_SPEED, SPAWN_CLEAR, SPEED_HI, SPEED_LO, SPEED_SCALE,
-                     SURVIVAL_POINTS, THRUST, TURN_RATE, V_FORWARD, V_SIDEWAYS, WAVE_BASE, WAVE_MAX, WAVE_TABLE)
+from .config import (BIG, CMD_PASSION, CMD_FIRE, CMD_THRUST, CMD_TURN, COOLDOWN, DRAG, DRIFT_TABLE, DT, FIELD,
+                     FIRE_ABOVE, GUN_READY, MAX_SPEED, N_MOODS, NEAREST, POINTS, RADIUS, RADIUS_SCALE, ROCK_CLOSE,
+                     ROCK_COS, ROCK_INPUTS, ROCK_RADIUS, ROCK_SIN, ROCK_SLOTS, ROCK_V_FORWARD, ROCK_V_SIDEWAYS,
+                     SELF_INPUTS, SENSE_RANGE, SHIP_R, SHOT_COST, SHOT_LIFE, SHOT_SLOTS, SHOT_SPEED, SPAWN_CLEAR,
+                     SPEED_HI, SPEED_LO, SPEED_SCALE, SURVIVAL_POINTS, THRUST, TURN_RATE, V_FORWARD, V_SIDEWAYS,
+                     WAVE_BASE, WAVE_MAX, WAVE_TABLE)
 from .scenario import Scenario
 
 DRAG_PER_STEP = float(np.exp(-DRAG * DT))
@@ -55,6 +56,7 @@ class Worlds:
         self.alive = np.ones(k, dtype=bool)
         self.thrust = np.zeros(k)
         self.cooldown = np.zeros(k)
+        self.mood = np.zeros((k, N_MOODS))
         self.rock_pos = np.zeros((k, ROCK_SLOTS, 2))
         self.rock_vel = np.zeros((k, ROCK_SLOTS, 2))
         self.rock_size = np.zeros((k, ROCK_SLOTS), dtype=np.int64)
@@ -115,7 +117,7 @@ class Worlds:
         own[:, V_FORWARD] = dot(self.vel, fwd) / SPEED_SCALE
         own[:, V_SIDEWAYS] = dot(self.vel, side) / SPEED_SCALE
         own[:, GUN_READY] = self.cooldown <= 0.0
-        return np.concatenate([own, rocks.reshape(self.size, -1)], axis=1)
+        return np.concatenate([own, rocks.reshape(self.size, -1), self.mood], axis=1)
 
     def step(self, commands: np.ndarray) -> None:
         self.events = []
@@ -123,6 +125,7 @@ class Worlds:
             return
         live = self.alive
         self.thrust = np.clip(commands[:, CMD_THRUST], 0.0, 1.0) * live
+        self.mood = np.clip(commands[:, CMD_PASSION:], -1.0, 1.0)
         self.ang = self.ang + np.clip(commands[:, CMD_TURN], -1.0, 1.0) * live * TURN_RATE * DT
         nose = self.nose()
         self._move_ship(nose)

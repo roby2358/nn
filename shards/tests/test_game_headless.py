@@ -39,6 +39,19 @@ def test_rounds_on_screen_have_no_time_limit(app):
     assert app.scene.world.step_limit == FREE_PLAY_STEPS
 
 
+def test_ship_runs_white_to_orange_with_patience():
+    assert art.ship_color(-1.0) == art.IMPATIENT
+    assert art.ship_color(1.0) == art.PATIENT
+
+
+def test_passion_halo_follows_the_heading_and_reddens():
+    wide, tall = art.passion_halo(0.5, 0.0).get_size(), art.passion_halo(0.5, 1.5708).get_size()
+    assert wide[0] > wide[1] and tall[1] > tall[0]
+    center = (art.HALO_LONG, art.HALO_SHORT)
+    calm, passionate = art.passion_halo(0.0, 0.0).get_at(center), art.passion_halo(1.0, 0.0).get_at(center)
+    assert passionate.r > calm.r and passionate.b < calm.b and passionate.a > calm.a
+
+
 def test_held_keys_reach_the_ship(app):
     app.toggle_fly()
     app.human.thrust = 1.0

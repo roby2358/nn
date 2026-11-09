@@ -7,14 +7,17 @@ import math
 import numpy as np
 import pygame
 
-from .config import FIELD_H, FIELD_W, RADIUS, ROCK_SLOTS, SHIP_R, TAU
+from .config import FIELD_H, FIELD_W, MOOD_PASSION, MOOD_PATIENCE, RADIUS, ROCK_SLOTS, SHIP_R, TAU
 from .worlds import Event, Worlds
 
 SPACE = (7, 8, 20)
 PANEL_BG = (22, 24, 34)
 TEXT = (230, 232, 240)
 MUTED = (140, 146, 165)
-SHIP = (232, 240, 255)
+IMPATIENT = (255, 255, 255)
+PATIENT = (255, 140, 40)
+CALM_HALO = (90, 110, 150)
+PASSION_HALO = (255, 40, 30)
 SHIP_TRIM = (255, 120, 90)
 FLAME = (255, 170, 60)
 FLAME_CORE = (255, 240, 190)
@@ -34,6 +37,11 @@ FLAME_FLICKER_HZ = 19.0
 FLAME_HALF_WIDTH = 0.45 * SHIP_R
 FLAME_CORE_HALF_WIDTH = 0.225 * SHIP_R
 TRIM_R = round(0.36 * SHIP_R)
+HALO_LONG = round(3.4 * SHIP_R)     # half the halo's length, along the ship's heading
+HALO_SHORT = round(2.2 * SHIP_R)
+HALO_EDGE_PX = 2
+HALO_FILL_ALPHA = (20, 120)         # calm and at full passion
+HALO_EDGE_ALPHA = (70, 235)
 SHOT_TAIL = 0.64 * SHIP_R
 SHOT_TIP = 0.27 * SHIP_R
 DEBRIS_BASE = 0.18 * SHIP_R
@@ -147,13 +155,37 @@ def _draw_flame(surf: pygame.Surface, x: float, y: float, c: float, s: float, th
                                            _at(x, y, c, s, rear - reach * 0.55, 0)])
 
 
-def draw_ship(surf: pygame.Surface, x: float, y: float, ang: float, thrust: float, t: float) -> None:
+def blend(low: tuple, high: tuple, frac: float) -> tuple:
+    """Each value `frac` of the way from low to high, holding at the ends."""
+    frac = min(max(frac, 0.0), 1.0)
+    return tuple(round(a + (b - a) * frac) for a, b in zip(low, high))
+
+
+def _alpha(ends: tuple[int, int], passion: float) -> int:
+    return blend(ends[:1], ends[1:], passion)[0]
+
+
+def ship_color(patience: float) -> tuple:
+    """White at no patience (-1), orange at full patience (+1)."""
+    return blend(IMPATIENT, PATIENT, (patience + 1.0) / 2.0)
+
+
+def passion_halo(passion: float, ang: float) -> pygame.Surface:
+    """An ellipse along the ship's heading, redder and more solid the more passionate it is."""
+    color = blend(CALM_HALO, PASSION_HALO, passion)
+    halo = pygame.Surface((2 * HALO_LONG, 2 * HALO_SHORT), pygame.SRCALPHA)
+    pygame.draw.ellipse(halo, (*color, _alpha(HALO_FILL_ALPHA, passion)), halo.get_rect())
+    pygame.draw.ellipse(halo, (*color, _alpha(HALO_EDGE_ALPHA, passion)), halo.get_rect(), HALO_EDGE_PX)
+    return pygame.transform.rotate(halo, -math.degrees(ang))
+
+
+def draw_ship(surf: pygame.Surface, x: float, y: float, ang: float, thrust: float, t: float, color: tuple) -> None:
     c, s = math.cos(ang), math.sin(ang)
     if thrust > 0.0:
         _draw_flame(surf, x, y, c, s, thrust, t)
     hull = [_at(x, y, c, s, SHIP_R * 1.3, 0), _at(x, y, c, s, -SHIP_R, SHIP_R * 0.85),
             _at(x, y, c, s, -SHIP_R * 0.45, 0), _at(x, y, c, s, -SHIP_R, -SHIP_R * 0.85)]
-    pygame.draw.polygon(surf, SHIP, hull)
+    pygame.draw.polygon(surf, color, hull)
     pygame.draw.circle(surf, SHIP_TRIM, _at(x, y, c, s, SHIP_R * 0.1, 0), TRIM_R)
 
 
@@ -161,8 +193,12 @@ def draw_player(surf: pygame.Surface, world: Worlds, t: float) -> None:
     if not world.alive[0]:
         return
     x, y = map(float, world.pos[0])
-    for ex, ey in _echoes(x, y, SHIP_R * 4):
-        draw_ship(surf, ex, ey, float(world.ang[0]), float(world.thrust[0]), t)
+    ang = float(world.ang[0])
+    passion, patience = float(world.mood[0, MOOD_PASSION]), float(world.mood[0, MOOD_PATIENCE])
+    halo, color = passion_halo(passion, ang), ship_color(patience)
+    for ex, ey in _echoes(x, y, max(HALO_LONG, SHIP_R * 4)):
+        surf.blit(halo, halo.get_rect(center=(round(ex), round(ey))))
+        draw_ship(surf, ex, ey, ang, float(world.thrust[0]), t, color)
 
 
 def smooth(values: list[float], keep: float) -> list[float]:

@@ -5,7 +5,7 @@ import sys
 import numpy as np
 
 from shards import evolve
-from shards.config import CMD_FIRE, CMD_THRUST, CMD_TURN, ELITES, N_INPUTS, POP_SIZE
+from shards.config import CMD_FIRE, CMD_THRUST, CMD_TURN, ELITES, N_INPUTS, N_OUTPUTS, POP_SIZE
 from shards.evolve import Evolver, evaluate, reproduce
 from shards.pilots import GENOME, Brains, random_genomes
 from shards.scenario import make_scenario
@@ -14,7 +14,7 @@ from shards.scenario import make_scenario
 def test_outputs_stay_in_their_ranges():
     rng = np.random.default_rng(0)
     out = Brains(random_genomes(rng, 50) * 30).act(rng.normal(0.0, 5.0, (50, N_INPUTS)))
-    assert out.shape == (50, 3)
+    assert out.shape == (50, N_OUTPUTS)
     assert (-1.0 <= out[:, CMD_TURN]).all() and (out[:, CMD_TURN] <= 1.0).all()
     squashed = out[:, [CMD_THRUST, CMD_FIRE]]
     assert (0.0 <= squashed).all() and (squashed <= 1.0).all()

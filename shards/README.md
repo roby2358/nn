@@ -24,14 +24,16 @@ big rock, up to twelve, appearing anywhere at least 170 px from the ship. Touchi
 
 ## The pilot
 
-- **Inputs (27, all in the ship's own frame and across the wrap):** the ship's forward and sideways velocity, whether
-  the gun is ready, and for each of the four nearest rocks its bearing (sin, cos), closeness, relative velocity
-  (forward, sideways) and radius. A slot with no rock is zeros.
-- **Net:** 24 tanh hidden units, then three continuous outputs: turn in -1..1, thrust in 0..1, and fire in 0..1
-  (the gun fires above 0.5).
+- **Inputs (29, all in the ship's own frame and across the wrap):** the ship's forward and sideways velocity, whether
+  the gun is ready, for each of the four nearest rocks its bearing (sin, cos), closeness, relative velocity
+  (forward, sideways) and radius, and the two moods. A slot with no rock is zeros.
+- **Net:** 24 tanh hidden units, then five continuous outputs: turn in -1..1, thrust in 0..1, fire in 0..1 (the gun
+  fires above 0.5), and passion and patience in -1..1. The moods come back as inputs on the next step, the net's only
+  memory, and each round starts at zero. On screen the ship runs white to orange as patience rises, and the ellipse
+  around it turns red with passion.
 - **Fitness:** points scored, plus 0.1 per second alive, minus 0.5 per shot fired. A typical hit is worth about 2.4 points,
   so a shot pays for itself only if it has better than about a 20% chance of landing.
-- **Genome:** 747 weights, evolved without gradients. Every net flies the same three freshly seeded fields each
+- **Genome:** 845 weights, evolved without gradients. Every net flies the same three freshly seeded fields each
   generation. The top 8 survive unchanged and are re-tested on new fields, so luck doesn't stick. The other 56 are
   mutated copies of them, a quarter of them crossed with a second elite.
 
@@ -39,8 +41,8 @@ All tuning numbers are in `src/shards/config.py`.
 
 ## The calculated pilot
 
-`just cc-calculated <out.npz>` builds a pilot with no training and writes it as an ordinary genome, the same 747
-weights in the same 27 -> 24 -> 3 net. It uses twenty-two hidden units; the other two are zeros.
+`just cc-calculated <out.npz>` builds a pilot with no training and writes it as an ordinary genome, the same 845
+weights in the same 29 -> 24 -> 5 net.
 
 It's a hunter: it turns toward the nearest rock, whichever that is at the moment, fires only when the shot would land,
 and moves by reading a danger field. Leading the target needs no extra machinery. For a rock with sideways relative
@@ -53,6 +55,10 @@ moving rock counts from where it will be a second and a half later. One says the
 threatens from behind. Thrust is the balance of the two: it advances while the way ahead is open and it's under
 100 px/s, eases off to a trickle when something blocks it, and burns away when danger behind outweighs danger ahead. A left/right pair
 per rock turns away from a close rock, outvoting the aim.
+
+Two moods bend all of that. Passion rises with the rocks within its stand-off and fades over a couple of seconds; at full
+passion the stand-off is 290 px instead of 160. Patience rises while the field is quiet and drains with rocks inside the
+stand-off, and takes up to 65 px off it: with no danger about, the ship closes in.
 
 ## Running
 

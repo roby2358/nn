@@ -3,9 +3,9 @@
 import numpy as np
 
 from shards.calculated import hunter
-from shards.config import (CMD_FIRE, CMD_THRUST, CMD_TURN, N_INPUTS, ROCK_CLOSE, ROCK_COS, ROCK_RADIUS, ROCK_SIN,
-                           ROCK_V_FORWARD, ROCK_V_SIDEWAYS, RUN_SECONDS, RUN_STEPS, SHOT_SPEED, SPEED_SCALE, V_FORWARD,
-                           rock_input)
+from shards.config import (CMD_FIRE, CMD_PASSION, CMD_PATIENCE, CMD_THRUST, CMD_TURN, PASSION, N_INPUTS, PATIENCE,
+                           ROCK_CLOSE, ROCK_COS, ROCK_RADIUS, ROCK_SIN, ROCK_V_FORWARD, ROCK_V_SIDEWAYS, RUN_SECONDS,
+                           RUN_STEPS, SHOT_SPEED, SPEED_SCALE, V_FORWARD, rock_input)
 from shards.evolve import fly
 from shards.pilots import GENOME, Brains
 from shards.scenario import make_scenario
@@ -55,8 +55,8 @@ def test_it_eases_off_when_a_rock_blocks_the_way():
 
 
 def test_a_rock_coming_at_the_nose_blocks_the_way_sooner():
-    assert hunter().act(seen(0.0, 1.0, 0.3, 0.0, 1.0))[0, CMD_THRUST] > 0.9
-    assert hunter().act(seen(0.0, 1.0, 0.3, 0.0, 1.0, v_forward=-100.0 / SPEED_SCALE))[0, CMD_THRUST] < 0.2
+    assert hunter().act(seen(0.0, 1.0, 0.6, 0.0, 1.0))[0, CMD_THRUST] > 0.9
+    assert hunter().act(seen(0.0, 1.0, 0.6, 0.0, 1.0, v_forward=-100.0 / SPEED_SCALE))[0, CMD_THRUST] < 0.2
 
 
 def test_it_stops_advancing_at_cruising_speed():
@@ -83,6 +83,34 @@ def test_it_does_not_burn_toward_a_close_rock_ahead():
 def test_it_turns_away_from_a_close_rock_abeam():
     assert hunter().act(seen(1.0, 0.0, 0.92, 0.0, 1.0))[0, CMD_TURN] < -0.5
     assert hunter().act(seen(-1.0, 0.0, 0.92, 0.0, 1.0))[0, CMD_TURN] > 0.5
+
+
+def test_a_passionate_ship_stands_off_further():
+    calm, passionate = seen(0.0, 1.0, 0.6, 0.0, 1.0), seen(0.0, 1.0, 0.6, 0.0, 1.0)
+    passionate[0, PASSION] = 1.0
+    assert hunter().act(calm)[0, CMD_THRUST] > 0.9
+    assert hunter().act(passionate)[0, CMD_THRUST] < 0.2
+
+
+def test_passion_rises_with_a_rock_inside_the_stand_off_and_fades_without_one():
+    assert hunter().act(seen(0.0, 1.0, 0.8, 0.0, 1.0))[0, CMD_PASSION] > 0.05
+    quiet = np.zeros((1, N_INPUTS))
+    quiet[0, PASSION] = 0.5
+    assert 0.0 < hunter().act(quiet)[0, CMD_PASSION] < 0.5
+
+
+def test_patience_rises_in_a_quiet_field_and_drains_with_a_rock_inside_the_stand_off():
+    quiet, crowded = np.zeros((1, N_INPUTS)), seen(0.0, 1.0, 0.8, 0.0, 1.0)
+    quiet[0, PATIENCE] = crowded[0, PATIENCE] = 0.2
+    assert hunter().act(quiet)[0, CMD_PATIENCE] > 0.2
+    assert hunter().act(crowded)[0, CMD_PATIENCE] < 0.2
+
+
+def test_a_patient_ship_closes_in():
+    impatient, patient = seen(0.0, 1.0, 0.72, 0.0, 1.0), seen(0.0, 1.0, 0.72, 0.0, 1.0)
+    patient[0, PATIENCE] = 1.0
+    assert hunter().act(impatient)[0, CMD_THRUST] < 0.2
+    assert hunter().act(patient)[0, CMD_THRUST] > 0.9
 
 
 def test_it_plays_a_real_round():

@@ -1,6 +1,6 @@
 # tenks
 
-Eight green tanks fight eight blue tanks on a wrapped field, every tank driven by its own small neural net. The nets
+Eight green tanks fight eight blue tanks on an open field with a deadly edge, every tank driven by its own small neural net. The nets
 learn by evolution. You can take over one of the tanks yourself.
 
 The battlefield is on the left. On the right are the controls and a live chart:
@@ -23,15 +23,16 @@ The battlefield is on the left. On the right are the controls and a live chart:
 - **Shells:** they fly at 450 px/s for 180 px, a quarter of the field. A shell goes off when it touches any live tank or
   reaches full range.
 - **Blast:** every tank within 15 px of the detonation dies outright. That includes teammates and the shooter.
-- **Tanks** block each other and wrecks don't block anything. Shell range is under half the field, so nothing can shoot
-  itself around the wrap.
+- **Tanks** block each other and wrecks don't block anything.
+- **Edge:** the field doesn't wrap. A tank whose center crosses the edge blows up, even if another tank shoved it there.
+  Only that tank dies and nobody gets credit. Shells fly on past the edge until they run out of range.
 - A battle lasts 30 s in training. If a team is wiped out, the survivors hold still and keep earning time.
 
 ## The net
 
-- **Inputs (25, all in the tank's own frame and across the wrap):** gun ready, then the four nearest live enemies and
-  the four nearest live teammates, each as bearing (sin, cos) and closeness. An absent contact is zeros. The net sees
-  positions only: no enemy heading or speed, and no shells.
+- **Inputs (25, all in the tank's own frame):** gun ready, then the four nearest live enemies and the four nearest live
+  teammates, each as bearing (sin, cos) and closeness. An absent contact is zeros. The net sees other tanks' positions
+  only: no enemy heading or speed, no shells, and not the edge of the field.
 - **Net:** two tanh hidden layers of 48 and 16 units, then left tread, right tread and shoot.
 - **Genome:** 2,083 weights, evolved without gradients.
 

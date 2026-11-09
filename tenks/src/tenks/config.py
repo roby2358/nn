@@ -19,7 +19,9 @@ GENS_PER_PRESS = 500         # one press of Evolve in the GUI
 # ---- teams: tanks 0..7 are green, 8..15 are blue -----------------------------------
 TEAM_SIZE = 8
 TANKS = 2 * TEAM_SIZE
-SPAWN_HALF_BAND = 90.0    # each team starts within this of its own vertical line
+SPAWN_LINE = 0.1 * FIELD_W  # green's vertical line, and blue's the same distance from the far side
+SPAWN_MARGIN = 40.0       # no tank starts closer than this to any edge
+SPAWN_HALF_BAND = SPAWN_LINE - SPAWN_MARGIN   # each team starts within this of its own line
 SPAWN_GAP = 40.0          # least distance between two tanks of a team at the start
 
 # ---- tanks: speed follows the treads directly, with no momentum --------------------

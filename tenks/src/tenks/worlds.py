@@ -11,12 +11,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .config import (CLOSE, CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, COS, DT, FIRE_ABOVE, FRIENDLY_KILL_COST,
-                     KILL_POINTS, MAX_SPEED, MUZZLE_GAP, N_INPUTS, NEAR_MISS_POINTS, NEAR_MISS_R, NEAREST, N_OUTPUTS,
+from .config import (CLOSE, CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, COS, DT, FIELD, FIRE_ABOVE,
+                     FRIENDLY_KILL_COST, KILL_POINTS, MAX_SPEED, MUZZLE_GAP, N_INPUTS, NEAR_MISS_POINTS, NEAR_MISS_R, NEAREST, N_OUTPUTS,
                      RELOAD, SENSE_RANGE, SHELL_LIFE, SHELL_SPEED, SIN, SPLASH_R, SURVIVAL_POINTS, TANK_R,
                      TANKS, TEAM_SIZE, TURN_RATE)
+from .geometry import dot, length
 from .scenario import Scenario
-from .torus import dot, length, shortest, wrap
 
 GREEN = np.arange(TANKS) < TEAM_SIZE
 BLUE = ~GREEN
@@ -69,7 +69,7 @@ class Worlds:
 
     def _tank_offsets(self) -> tuple[np.ndarray, np.ndarray]:
         """(W, T, T, 2) from each tank i to each tank j, and its (W, T, T) length."""
-        delta = shortest(self.pos[:, None] - self.pos[:, :, None])
+        delta = self.pos[:, None] - self.pos[:, :, None]
         return delta, length(delta)
 
     def observe(self) -> np.ndarray:
@@ -108,9 +108,10 @@ class Worlds:
         fighting = self.alive & ~self.over[:, None]
         self._drive(orders, fighting)
         self._block()
+        self._blow_up_strays()
         expired = self._advance_shells()
         self.cooldown = np.maximum(self.cooldown - DT, 0.0)
-        self._fire(fighting & (orders[..., CMD_SHOOT] > FIRE_ABOVE))
+        self._fire(fighting & self.alive & (orders[..., CMD_SHOOT] > FIRE_ABOVE))
         self._resolve_shells(expired)
         self.survived += self.alive * DT
         self.steps += 1
@@ -121,7 +122,7 @@ class Worlds:
         right = np.clip(orders[..., CMD_RIGHT], -1.0, 1.0) * fighting
         self.ang = self.ang + (left - right) / 2.0 * TURN_RATE * DT
         speed = (left + right) / 2.0 * MAX_SPEED
-        self.pos = wrap(self.pos + self.nose() * speed[..., None] * DT)
+        self.pos = self.pos + self.nose() * speed[..., None] * DT
 
     def _block(self) -> None:
         """Overlapping live tanks each back off by half the overlap."""
@@ -129,19 +130,25 @@ class Worlds:
         pairs = self.alive[:, :, None] & self.alive[:, None] & ~np.eye(TANKS, dtype=bool)
         overlap = np.maximum(2.0 * TANK_R - dist, 0.0) * pairs
         away = -delta / np.maximum(dist, 1e-9)[..., None]
-        self.pos = wrap(self.pos + (away * overlap[..., None] / 2.0).sum(2))
+        self.pos = self.pos + (away * overlap[..., None] / 2.0).sum(2)
+
+    def _blow_up_strays(self) -> None:
+        """A live tank whose centre has left the field dies. It takes nobody with it and nobody gets the credit."""
+        strayed = self.alive & ((self.pos < 0.0) | (self.pos > FIELD)).any(2)
+        self.alive &= ~strayed
+        self.blasts += [Blast(int(w), tuple(self.pos[w, t])) for w, t in zip(*np.nonzero(strayed))]
 
     def _advance_shells(self) -> np.ndarray:
         """Move the shells in flight; returns (W, T), the ones that just reached full range."""
         flying = self.shell_ttl > 0.0
-        self.shell_pos = wrap(self.shell_pos + self.shell_vel * DT)
+        self.shell_pos = self.shell_pos + self.shell_vel * DT
         self.shell_ttl = np.maximum(self.shell_ttl - DT, 0.0)
         return flying & (self.shell_ttl <= 0.0)
 
     def _fire(self, trigger: np.ndarray) -> None:
         can = trigger & (self.cooldown <= 0.0)
         nose = self.nose()
-        self.shell_pos[can] = wrap(self.pos[can] + nose[can] * (TANK_R + MUZZLE_GAP))
+        self.shell_pos[can] = self.pos[can] + nose[can] * (TANK_R + MUZZLE_GAP)
         self.shell_vel[can] = nose[can] * SHELL_SPEED
         self.shell_ttl[can] = SHELL_LIFE
         self.shell_near[can] = False
@@ -152,7 +159,7 @@ class Worlds:
         """Every shell going off this step acts on the same live tanks, so two shells that
         catch one tank both get the kill and neither depends on the order of the slots."""
         active = expired | (self.shell_ttl > 0.0)
-        reach = length(shortest(self.pos[:, None] - self.shell_pos[:, :, None]))   # (W, shell, tank)
+        reach = length(self.pos[:, None] - self.shell_pos[:, :, None])   # (W, shell, tank)
         alive = self.alive[:, None]
         self.shell_near |= active & ((reach < NEAR_MISS_R) & alive & ENEMY).any(2)
         touched = active & ((reach < TANK_R) & alive).any(2)
@@ -166,4 +173,4 @@ class Worlds:
         self.near_misses += blown & self.shell_near & ~killed_enemy.any(2)
         self.alive &= ~caught.any(1)
         self.shell_ttl[blown] = 0.0
-        self.blasts = [Blast(int(w), tuple(self.shell_pos[w, s])) for w, s in zip(*np.nonzero(blown))]
+        self.blasts += [Blast(int(w), tuple(self.shell_pos[w, s])) for w, s in zip(*np.nonzero(blown))]

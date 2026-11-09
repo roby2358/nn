@@ -44,13 +44,6 @@ def _box(x: float, y: float, c: float, s: float, along: tuple[float, float], acr
     return [_at(x, y, c, s, along[i], across[j]) for i, j in ((0, 0), (1, 0), (1, 1), (0, 1))]
 
 
-def _echoes(x: float, y: float, reach: float) -> list[tuple[float, float]]:
-    """Every place a wrapped thing must be drawn so that it slides off one edge and onto the other."""
-    xs = [x] + [x + d for d in (-FIELD_W, FIELD_W) if -reach < x + d < FIELD_W + reach]
-    ys = [y] + [y + d for d in (-FIELD_H, FIELD_H) if -reach < y + d < FIELD_H + reach]
-    return [(ex, ey) for ex in xs for ey in ys]
-
-
 def draw_tank(surf: pygame.Surface, x: float, y: float, ang: float, colors: tuple) -> None:
     hull, treads, turret = colors
     c, s = math.cos(ang), math.sin(ang)
@@ -81,9 +74,8 @@ class BlastRings:
         overlay = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
         for x, y, life in self.rings:
             fade = life / BLAST_LIFE
-            for ex, ey in _echoes(x, y, SPLASH_R):
-                pygame.draw.circle(overlay, (*BLAST_FILL, int(110 * fade)), (ex, ey), SPLASH_R)
-                pygame.draw.circle(overlay, (*BLAST_RIM, int(230 * fade)), (ex, ey), SPLASH_R, 2)
+            pygame.draw.circle(overlay, (*BLAST_FILL, int(110 * fade)), (x, y), SPLASH_R)
+            pygame.draw.circle(overlay, (*BLAST_RIM, int(230 * fade)), (x, y), SPLASH_R, 2)
         surf.blit(overlay, (0, 0))
 
 
@@ -118,8 +110,7 @@ class Battlefield:
     def _draw_tanks(self, worlds: Worlds, tanks: np.ndarray, colors_of) -> None:
         for tank in tanks:
             x, y = map(float, worlds.pos[0, tank])
-            for ex, ey in _echoes(x, y, TANK_R * 2):
-                draw_tank(self.surf, ex, ey, float(worlds.ang[0, tank]), colors_of(tank))
+            draw_tank(self.surf, x, y, float(worlds.ang[0, tank]), colors_of(tank))
 
     def _draw_shells(self, worlds: Worlds) -> None:
         for shell in range(TANKS):
@@ -138,8 +129,7 @@ class Battlefield:
         """Circle these tanks, while they live, so that you can find yours in the crowd."""
         for tank in tanks[worlds.alive[0, tanks]]:
             x, y = map(float, worlds.pos[0, tank])
-            for ex, ey in _echoes(x, y, TANK_R * 2):
-                pygame.draw.circle(self.surf, TEXT, (ex, ey), TANK_R * 2, 2)
+            pygame.draw.circle(self.surf, TEXT, (x, y), TANK_R * 2, 2)
 
 
 def smooth(values: list[float], keep: float) -> list[float]:

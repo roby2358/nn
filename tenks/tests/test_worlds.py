@@ -5,10 +5,11 @@ import math
 import numpy as np
 import pytest
 
-from tenks.config import (CLOSE, COS, DT, MAX_SPEED, N_INPUTS, N_OUTPUTS, RELOAD, SELF_INPUTS, SENSE_RANGE,
-                          SHELL_RANGE, SHELL_SPEED, SIN, SPLASH_R, SURVIVAL_POINTS, TANK_R, TANKS, TURN_RATE)
+from tenks.config import (CLOSE, COS, DT, FIELD, FIELD_W, MAX_SPEED, N_INPUTS, N_OUTPUTS, RELOAD, SELF_INPUTS,
+                          SENSE_RANGE, SHELL_RANGE, SHELL_SPEED, SIN, SPAWN_HALF_BAND, SPAWN_LINE, SPAWN_MARGIN,
+                          SPLASH_R, SURVIVAL_POINTS, TANK_R, TANKS, TURN_RATE)
+from tenks.geometry import length
 from tenks.scenario import Scenario, make_scenario
-from tenks.torus import length, shortest
 from tenks.worlds import Worlds
 
 GREEN_A, GREEN_B, BLUE_A, BLUE_B = 0, 1, 8, 9
@@ -76,16 +77,44 @@ def test_reverse_backs_up_and_speed_stops_with_the_treads():
     assert w.pos[0, GREEN_A] == pytest.approx([100.0 - MAX_SPEED, 300.0])
 
 
-def test_tanks_wrap_at_the_edge():
+@pytest.mark.parametrize("start", [(719.9, 300.0, 0.0), (0.1, 300.0, math.pi),
+                                   (300.0, 0.1, -math.pi / 2), (300.0, 719.9, math.pi / 2)])
+def test_a_tank_that_drives_off_any_edge_blows_up(start):
+    w = arena({GREEN_A: start})
+    w.step(orders(t0=(1.0, 1.0, 0.0)))
+    assert not w.alive[0, GREEN_A]
+    assert [b.pos for b in w.blasts] == [tuple(w.pos[0, GREEN_A])]
+    assert w.kills.sum() == 0 and w.friendly_kills.sum() == 0
+
+
+def test_a_tank_on_the_edge_is_still_on_the_field():
     w = arena({GREEN_A: (719.0, 300.0, 0.0)})
-    run(w, orders(t0=(1.0, 1.0, 0.0)), 0.1)
-    assert 0.0 < w.pos[0, GREEN_A, 0] < 10.0
+    w.step(orders())
+    assert w.alive[0, GREEN_A]
+
+
+def test_a_tank_shoved_over_the_edge_blows_up_and_the_other_lives():
+    w = arena({GREEN_A: (1.0, 300.0, 0.0), BLUE_A: (5.0, 300.0, 0.0)})
+    w.step(orders())
+    assert not w.alive[0, GREEN_A] and w.alive[0, BLUE_A]
+
+
+def test_a_tank_blowing_up_at_the_edge_fires_nothing():
+    w = arena({GREEN_A: (719.9, 300.0, 0.0)})
+    w.step(orders(t0=(1.0, 1.0, 1.0)))
+    assert w.fired[0, GREEN_A] == 0
+
+
+def test_shells_do_not_come_back_around_the_far_side():
+    w = arena({GREEN_A: (700.0, 300.0, 0.0), BLUE_A: (10.0, 300.0, 0.0)})
+    fire_once(w, GREEN_A, 0.5)
+    assert w.alive[0, BLUE_A] and w.kills[0, GREEN_A] == 0
 
 
 def test_tanks_block_each_other():
     w = arena({GREEN_A: (300.0, 300.0, 0.0), BLUE_A: (300.0 + 2.0 * TANK_R - 3.0, 300.0, 0.0)})
     w.step(orders())
-    assert length(shortest(w.pos[0, BLUE_A] - w.pos[0, GREEN_A])) == pytest.approx(2.0 * TANK_R)
+    assert length(w.pos[0, BLUE_A] - w.pos[0, GREEN_A]) == pytest.approx(2.0 * TANK_R)
 
 
 def test_dead_tanks_do_not_block():
@@ -191,11 +220,11 @@ def test_observation_lists_nearest_enemies_first_in_the_tanks_own_frame():
     assert second[CLOSE] == pytest.approx(1.0 - 200.0 / SENSE_RANGE)
 
 
-def test_observation_measures_across_the_wrap():
+def test_observation_measures_straight_across_the_field():
     w = arena({GREEN_A: (710.0, 300.0, 0.0), BLUE_A: (20.0, 300.0, 0.0)})
     enemy = w.observe()[GREEN_A, ENEMY_BLOCK:ENEMY_BLOCK + 3]
-    assert enemy[COS] == pytest.approx(1.0)
-    assert enemy[CLOSE] == pytest.approx(1.0 - 30.0 / SENSE_RANGE)
+    assert enemy[COS] == pytest.approx(-1.0)
+    assert enemy[CLOSE] == 0.0
 
 
 def test_observation_friends_leave_out_the_tank_itself_and_absent_slots_are_zero():
@@ -210,7 +239,7 @@ def test_dead_tanks_see_nothing_and_are_not_seen():
     w.alive[0, BLUE_A] = False
     obs = w.observe()
     assert (obs[BLUE_A] == 0.0).all()
-    parked = length(shortest(w.pos[0, FAR_BLUE] - w.pos[0, GREEN_A]))
+    parked = length(w.pos[0, FAR_BLUE] - w.pos[0, GREEN_A])
     assert obs[GREEN_A, ENEMY_BLOCK + CLOSE] == pytest.approx(max(1.0 - parked / SENSE_RANGE, 0.0))
     assert (obs[GREEN_A, ENEMY_BLOCK + 3:FRIEND_BLOCK] == 0.0).all()   # the parked blue tank is the only one visible
 
@@ -230,8 +259,20 @@ def test_a_decided_battle_freezes_movement_and_survivors_keep_scoring():
 def test_scenarios_are_repeatable_and_teams_start_out_of_range():
     a, b = make_scenario(5), make_scenario(5)
     assert np.array_equal(a.spots, b.spots) and np.array_equal(a.headings, b.headings)
-    gaps = length(shortest(a.spots[:8][:, None] - a.spots[8:][None]))
+    gaps = length(a.spots[:8][:, None] - a.spots[8:][None])
     assert gaps.min() >= SHELL_RANGE - 1e-9
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_no_tank_starts_near_an_edge(seed):
+    spots = make_scenario(seed).spots
+    assert spots.min() >= SPAWN_MARGIN - 1e-9 and (spots <= FIELD - SPAWN_MARGIN + 1e-9).all()
+
+
+def test_the_teams_start_around_a_tenth_of_the_way_in_from_opposite_sides():
+    spots = make_scenario(5).spots
+    assert abs(spots[:8, 0] - SPAWN_LINE).max() <= SPAWN_HALF_BAND
+    assert abs(spots[8:, 0] - (FIELD_W - SPAWN_LINE)).max() <= SPAWN_HALF_BAND
 
 
 def test_commands_stay_clipped():

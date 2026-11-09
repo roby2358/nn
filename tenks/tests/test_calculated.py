@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 
 from tenks.calculated import MIN_RANGE, STOP_RANGE, charger, closeness
-from tenks.config import CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, FIRE_ABOVE, N_INPUTS, NEAREST, SELF_INPUTS
+from tenks.config import (CMD_LEFT, CMD_RIGHT, CMD_SHOOT, CONTACT_INPUTS, FIRE_ABOVE, N_INPUTS, NEAREST, SELF_INPUTS,
+                          SENSE_RANGE)
 from tenks.pilots import GENOME, Brains
 
 Contact = tuple[float, float]    # degrees off the nose (positive is the +sin side), px away
@@ -84,6 +85,13 @@ def test_steers_toward_the_nearest_enemy(net):
 def test_charges_when_lined_up(net):
     out = command(net, [(0.0, 300.0)], [])
     assert out[CMD_LEFT] > 0.8 and out[CMD_RIGHT] > 0.8
+
+
+def test_charges_and_steers_at_an_enemy_too_far_away_to_register_closeness(net):
+    ahead = command(net, [(0.0, SENSE_RANGE)], [])
+    assert ahead[CMD_LEFT] > 0.8 and ahead[CMD_RIGHT] > 0.8
+    off_side = command(net, [(25.0, SENSE_RANGE)], [])
+    assert off_side[CMD_LEFT] > off_side[CMD_RIGHT]
 
 
 def test_stops_short_and_backs_off_inside_the_stop_distance(net):

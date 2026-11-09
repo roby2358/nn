@@ -1,0 +1,36 @@
+# The project dir is shared between container and host, so each side gets its
+# own venv, named by hostname (override with VENV=path just setup).
+
+set shell := ["bash", "-cu"]
+
+venv := env("VENV", ".venv-" + `hostname`)
+python := venv / "bin/python"
+
+default:
+    @just --list
+
+# Create the per-host venv and install the project (editable) with dev deps
+setup:
+    uv venv --allow-existing {{venv}}
+    uv pip install --python {{python}} -e ".[dev]"
+
+# Run tests headless
+test:
+    SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy {{python}} -m pytest -q
+
+# Evolve headless; resumes from and saves swarm.npz + weights.npz
+evolve gens:
+    {{python}} -m tenks.evolve {{gens}}
+
+# Remove this host's venv and build artifacts
+clean:
+    rm -rf {{venv}} build dist *.egg-info .pytest_cache
+    find . -name __pycache__ -type d -exec rm -rf {} +
+
+# Play a swarm or weights file as green against random nets on N fixed battles
+cc-stats weights n:
+    {{python}} -m tenks.stats {{weights}} {{n}}
+
+# Record a swarm or weights file fighting one battle to an MP4
+cc-video weights seed seconds out:
+    {{python}} -m tenks.video {{weights}} {{seed}} {{seconds}} {{out}}

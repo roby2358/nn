@@ -12,8 +12,8 @@ tanh half-planes pulls the trigger when |e| is inside a tolerance, the rock is a
 The danger field gives each of the four visible rocks two half-planes in closeness, bearing and
 forward relative speed, so a moving rock counts from where it will be LOOK_AHEAD seconds on. One
 says the rock blocks the space ahead, the other that it threatens from behind. Thrust is their
-balance: advance while nothing blocks the way and the ship is under cruising speed, hold when
-something does, and burn away when danger behind outweighs danger ahead. A left/right pair per
+balance: advance while nothing blocks the way and the ship is under cruising speed, ease off to a
+trickle when something does, and burn away when danger behind outweighs danger ahead. A left/right pair per
 rock turns away from a close rock, outweighing the aim.
 """
 
@@ -38,19 +38,19 @@ TURN_GAIN = 12.0        # turn command per radian of aiming error
 SHARP = 100.0           # how hard the half-plane units switch
 COS_MIN = 0.5           # the rock counts as ahead above this
 CLOSE_MIN = 0.1         # closeness below this is out of shot range, and an empty slot is 0
-TOL_BASE = 0.0          # aiming tolerance in sin units, an affine fit to the rock's angular radius
+TOL_BASE = 0.03         # aiming tolerance in sin units, an affine fit to the rock's angular radius
 TOL_CLOSE = 0.05
 TOL_SIZE = 0.05
 FIRE_BIAS = -3.5        # four units at +1 clear this; any one at -1 does not
 
 LOOK_AHEAD = 1.0        # seconds; a moving rock counts from where it will be this much later
-CLEAR_AHEAD = 160.0     # px of clear space a rock dead ahead must leave for the way to count as open
+CLEAR_AHEAD = 130.0     # px of clear space a rock dead ahead must leave for the way to count as open
 BLOCK_SLANT = 0.1       # how much less a rock counts as blocking per unit of bearing away from dead ahead
 DANGER = 75.0           # px of clear space at which a rock abeam counts as a threat
 CHASE_SLANT = 0.15      # how much sooner a rock behind is a threat, and later one ahead
 CRUISE = 140.0          # px/s of forward speed above which the way ahead earns no more thrust
 OPEN_WEIGHT = 3.0       # what an open way, or cruising speed, says to thrust
-BLOCK_WEIGHT = 3.0      # one blocking rock cancels an open way
+BLOCK_WEIGHT = 2.0      # one blocking rock cuts an open way's thrust to a trickle
 CHASE_WEIGHT = 4.0      # one threat behind outweighs one rock blocking the way
 DODGE_WEIGHT = 8.0      # one dodge pair outvotes the aiming error
 

@@ -51,7 +51,7 @@ the fire output: error inside a tolerance on either side, rock ahead, rock in ra
 The danger field gives each of the four visible rocks two units on closeness, bearing and forward relative speed, so a
 moving rock counts from where it will be a second later. One says the rock blocks the way ahead, the other that it
 threatens from behind. Thrust is the balance of the two: it advances while the way ahead is open and it's under
-140 px/s, holds when something blocks it, and burns away when danger behind outweighs danger ahead. A left/right pair
+140 px/s, eases off to a trickle when something blocks it, and burns away when danger behind outweighs danger ahead. A left/right pair
 per rock turns away from a close rock, outvoting the aim.
 
 ## Running

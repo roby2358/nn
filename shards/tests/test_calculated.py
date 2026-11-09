@@ -50,13 +50,13 @@ def test_it_advances_when_the_way_ahead_is_open():
     assert hunter().act(seen(0.0, 1.0, 0.3, 0.0, 1.0))[0, CMD_THRUST] > 0.9
 
 
-def test_it_holds_when_a_rock_blocks_the_way():
-    assert hunter().act(seen(0.0, 1.0, 0.75, 0.0, 1.0))[0, CMD_THRUST] < 0.1
+def test_it_eases_off_when_a_rock_blocks_the_way():
+    assert hunter().act(seen(0.0, 1.0, 0.8, 0.0, 1.0))[0, CMD_THRUST] < 0.2
 
 
 def test_a_rock_coming_at_the_nose_blocks_the_way_sooner():
-    assert hunter().act(seen(0.0, 1.0, 0.5, 0.0, 1.0))[0, CMD_THRUST] > 0.9
-    assert hunter().act(seen(0.0, 1.0, 0.5, 0.0, 1.0, v_forward=-100.0 / SPEED_SCALE))[0, CMD_THRUST] < 0.1
+    assert hunter().act(seen(0.0, 1.0, 0.6, 0.0, 1.0))[0, CMD_THRUST] > 0.9
+    assert hunter().act(seen(0.0, 1.0, 0.6, 0.0, 1.0, v_forward=-100.0 / SPEED_SCALE))[0, CMD_THRUST] < 0.2
 
 
 def test_it_stops_advancing_at_cruising_speed():
@@ -77,7 +77,7 @@ def test_a_rock_coming_up_from_behind_is_a_threat_sooner():
 
 
 def test_it_does_not_burn_toward_a_close_rock_ahead():
-    assert hunter().act(seen(0.0, 1.0, 0.95, 0.0, 1.0))[0, CMD_THRUST] < 0.1
+    assert hunter().act(seen(0.0, 1.0, 0.95, 0.0, 1.0))[0, CMD_THRUST] < 0.2
 
 
 def test_it_turns_away_from_a_close_rock_abeam():

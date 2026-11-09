@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from tenks import evolve
 from tenks.config import CMD_LEFT, CMD_RIGHT, CMD_SHOOT, ELITES, N_INPUTS, N_OUTPUTS, POP_SIZE, RUN_STEPS, TANKS
 from tenks.evolve import Evolver, deal, evaluate, fight, reproduce
 from tenks.pilots import GENOME, Brains, load_roster, random_genomes, save_champion, seat
@@ -59,9 +60,33 @@ def test_save_and_load_round_trip(tmp_path):
     a.step()
     a.save(swarm, weights)
     b = Evolver(4)
-    b.load(swarm)
+    b.load(swarm, weights)
     assert np.array_equal(a.genomes, b.genomes)
     assert a.history == b.history
+
+
+def test_a_weights_file_alone_takes_the_top_spot_of_a_random_swarm(tmp_path):
+    weights = tmp_path / "weights.npz"
+    champion = random_genomes(np.random.default_rng(8), 1)[0]
+    save_champion(weights, champion)
+    ev = Evolver(9)
+    report = ev.load(tmp_path / "missing.npz", weights)
+    assert np.array_equal(ev.genomes[0], champion)
+    assert (not report.swarm_found, report.leader_found, ev.gen) == (True, True, 0)
+
+
+def test_a_generation_under_way_when_the_population_is_replaced_is_dropped(monkeypatch):
+    ev = Evolver(7)
+    real_evaluate = evolve.evaluate
+
+    def evaluate_then_reset(*args):
+        result = real_evaluate(*args)
+        ev.reset()
+        return result
+
+    monkeypatch.setattr(evolve, "evaluate", evaluate_then_reset)
+    ev.step()
+    assert ev.gen == 0
 
 
 def test_a_roster_comes_from_a_swarm_or_a_single_champion(tmp_path):

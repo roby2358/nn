@@ -45,6 +45,27 @@ class Brains:
         return out
 
 
+class HumanDriver:
+    """The keyboard's one tank. The UI writes `command` (left, right, shoot) every frame."""
+
+    def __init__(self) -> None:
+        self.command = np.zeros(N_OUTPUTS)
+
+
+class Commandeered:
+    """Nets drive every tank except one, which does what the human says."""
+
+    def __init__(self, brains: Brains, human: HumanDriver, tank: int) -> None:
+        self.brains = brains
+        self.human = human
+        self.tank = tank
+
+    def act(self, obs: np.ndarray) -> np.ndarray:
+        out = self.brains.act(obs)
+        out[self.tank] = self.human.command
+        return out
+
+
 def save_champion(path: Path, genome: np.ndarray) -> None:
     np.savez(path, champion=genome)
 

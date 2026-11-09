@@ -18,6 +18,13 @@ WRECK_DARK = (52, 49, 43)
 SHELL = (255, 240, 170)
 BLAST_RIM = (255, 180, 90)
 BLAST_FILL = (255, 130, 50)
+PANEL_BG = (30, 30, 26)
+MUTED = (150, 148, 134)
+CHART_BG = (20, 20, 17)
+CHART_GRID = (46, 46, 40)
+BEST = (150, 220, 150)
+MEAN = (82, 130, 214)
+DANGER = (255, 110, 80)
 
 # (hull, treads, turret) by team
 GREEN_TANK = ((86, 168, 92), (40, 80, 46), (150, 220, 150))
@@ -99,8 +106,8 @@ class Battlefield:
         return ground
 
     def draw(self, worlds: Worlds, label: str) -> None:
-        self.rings.add(worlds.blasts)
-        self.rings.update(DT)
+        """Paint the battle as it stands. The caller feeds `rings` as it steps the world,
+        because a frame can cover several steps and each step replaces worlds.blasts."""
         self.surf.blit(self.ground, (0, 0))
         self._draw_tanks(worlds, np.flatnonzero(~worlds.alive[0]), lambda tank: WRECK_TANK)
         self._draw_tanks(worlds, np.flatnonzero(worlds.alive[0]), lambda tank: GREEN_TANK if GREEN[tank] else BLUE_TANK)
@@ -126,3 +133,50 @@ class Battlefield:
         green, blue = int(worlds.alive[0, GREEN].sum()), int(worlds.alive[0, ~GREEN].sum())
         line = f"green {green}   blue {blue}   {worlds.steps * DT:4.1f}s   {label}"
         self.surf.blit(self.font.render(line, True, TEXT), (HUD_MARGIN, HUD_MARGIN))
+
+    def ring(self, worlds: Worlds, tanks: np.ndarray) -> None:
+        """Circle these tanks, while they live, so that you can find yours in the crowd."""
+        for tank in tanks[worlds.alive[0, tanks]]:
+            x, y = map(float, worlds.pos[0, tank])
+            for ex, ey in _echoes(x, y, TANK_R * 2):
+                pygame.draw.circle(self.surf, TEXT, (ex, ey), TANK_R * 2, 2)
+
+
+def smooth(values: list[float], keep: float) -> list[float]:
+    """Exponential moving average of the series."""
+    out, avg = [], values[0]
+    for v in values:
+        avg = keep * avg + (1.0 - keep) * v
+        out.append(avg)
+    return out
+
+
+def faded(color: tuple) -> tuple:
+    return tuple(c // 3 for c in color)
+
+
+def draw_chart(surf: pygame.Surface, rect: pygame.Rect, series: list[tuple[list[float], tuple]],
+               font: pygame.font.Font) -> None:
+    """Each series drawn raw and faint, with its moving average bold on top. One shared set of axes."""
+    pygame.draw.rect(surf, CHART_BG, rect, border_radius=6)
+    n = max(len(s[0]) for s in series)
+    if n < 2:
+        msg = font.render("Press Evolve to start a run of generations.", True, MUTED)
+        surf.blit(msg, msg.get_rect(center=rect.center))
+        return
+    top = max(0.0, *(max(s[0]) for s in series)) * 1.1 or 1.0
+    inner = rect.inflate(-16, -16)
+    grid = [(inner.bottom - frac * inner.height, top * frac) for frac in (0.25, 0.5, 0.75)]
+    for y, _ in grid:
+        pygame.draw.line(surf, CHART_GRID, (inner.left, y), (inner.right, y))
+
+    def points(values: list[float]) -> list[tuple[float, float]]:
+        return [(inner.left + i * inner.width / (n - 1), inner.bottom - max(v, 0.0) / top * inner.height)
+                for i, v in enumerate(values)]
+
+    for values, color in series:
+        pygame.draw.lines(surf, faded(color), False, points(values), 1)
+    for values, color in series:
+        pygame.draw.lines(surf, color, False, points(smooth(values, 0.95)), 2)
+    for y, value in grid:
+        surf.blit(font.render(f"{value:.0f}", True, MUTED), (inner.left + 2, y - 16))

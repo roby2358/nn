@@ -1,7 +1,18 @@
 # tenks
 
 Eight green tanks fight eight blue tanks on a wrapped field, every tank driven by its own small neural net. The nets
-learn by evolution. This first version is headless: training, stats and video, with no interactive GUI yet.
+learn by evolution. You can take over one of the tanks yourself.
+
+The battlefield is on the left. On the right are the controls and a live chart:
+
+- **Drive** puts you in the ringed green tank: up/down drive, left/right turn, space fires, `R` restarts. The battle has
+  no time limit and ends when you die or a team is wiped out. **Watch** goes back to the leaders fighting each other.
+- **Evolve** runs up to 500 generations in the background. **Stop** halts early.
+- **Clear** starts over from a random population.
+- **Save** / **Load** write and read `swarm.npz` (all 64 nets and the chart history) and `weights.npz` (the leader).
+  Both load automatically at startup.
+
+`F` cycles watch speed (x1, x4, x16). `Esc`/`Q` quits.
 
 ## The game
 
@@ -52,6 +63,7 @@ The project dir is shared between container and host, so each side gets its own 
 ```sh
 just setup        # create this host's venv and install
 just test         # headless tests
+just up           # launch the GUI, needs a display
 just evolve 300   # evolve headless, resumes from and saves swarm.npz + weights.npz
 just cc-stats swarm.npz 200                  # win rate and rates per tank against random nets
 just cc-video swarm.npz 0 30 tenks.mp4       # record one battle

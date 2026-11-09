@@ -1,5 +1,6 @@
 # The project dir is shared between container and host, so each side gets its
 # own venv, named by hostname (override with VENV=path just setup).
+# The container can test and evolve headless; the GUI needs a display (`just up`).
 
 set shell := ["bash", "-cu"]
 
@@ -13,6 +14,10 @@ default:
 setup:
     uv venv --allow-existing {{venv}}
     uv pip install --python {{python}} -e ".[dev]"
+
+# Launch the game (needs a display)
+up:
+    {{python}} -m tenks.game
 
 # Run tests headless
 test:
@@ -30,6 +35,10 @@ clean:
 # Play a swarm or weights file as green against random nets on N fixed battles
 cc-stats weights n:
     {{python}} -m tenks.stats {{weights}} {{n}}
+
+# Save headless screenshots of the whole window into a directory, N seconds into a battle
+cc-shot seconds dir:
+    {{python}} -m tenks.shot {{seconds}} {{dir}}
 
 # Record a swarm or weights file fighting one battle to an MP4
 cc-video weights seed seconds out:

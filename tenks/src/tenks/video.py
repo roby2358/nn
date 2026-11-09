@@ -34,6 +34,8 @@ def record(worlds: Worlds, brains: Brains, label: str, seed: int, out: Path) -> 
     ending = ENDING_FRAMES
     while not worlds.done and ending > 0:
         worlds.step(brains.act(worlds.observe()))
+        field.rings.add(worlds.blasts)
+        field.rings.update(DT)
         field.draw(worlds, label)
         video.stdin.write(pygame.image.tobytes(field.surf, "RGB"))
         ending -= int(worlds.over[0])

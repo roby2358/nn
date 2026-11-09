@@ -31,7 +31,7 @@ class Blast:
 
 
 class Worlds:
-    def __init__(self, scenarios: list[Scenario], step_limit: int) -> None:
+    def __init__(self, scenarios: list[Scenario], step_limit: float) -> None:
         w = len(scenarios)
         self.count = w
         self.step_limit = step_limit

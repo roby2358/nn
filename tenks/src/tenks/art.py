@@ -7,7 +7,7 @@ import math
 import numpy as np
 import pygame
 
-from .config import DT, FIELD_H, FIELD_W, SHELL_SPEED, SPLASH_R, TANK_R, TANKS
+from .config import DT, FIELD_H, FIELD_W, SPLASH_R, TANK_R, TANKS
 from .worlds import GREEN, Blast, Worlds
 
 GROUND = (46, 44, 36)
@@ -32,7 +32,7 @@ BLUE_TANK = ((82, 130, 214), (36, 60, 110), (150, 190, 245))
 WRECK_TANK = (WRECK, WRECK_DARK, WRECK)
 
 BLAST_LIFE = 0.35          # seconds a blast stays on screen
-SHELL_TRAIL = 3 * SHELL_SPEED * DT
+SHELL_SIDE = 2             # a shell is a square dot this many pixels across
 HUD_MARGIN = 10
 
 
@@ -117,8 +117,7 @@ class Battlefield:
             if worlds.shell_ttl[0, shell] <= 0.0:
                 continue
             x, y = worlds.shell_pos[0, shell]
-            dx, dy = worlds.shell_vel[0, shell] / SHELL_SPEED
-            pygame.draw.line(self.surf, SHELL, (x - dx * SHELL_TRAIL, y - dy * SHELL_TRAIL), (x, y), 3)
+            self.surf.fill(SHELL, (round(x) - SHELL_SIDE // 2, round(y) - SHELL_SIDE // 2, SHELL_SIDE, SHELL_SIDE))
 
     def _draw_hud(self, worlds: Worlds, label: str) -> None:
         green, blue = int(worlds.alive[0, GREEN].sum()), int(worlds.alive[0, ~GREEN].sum())

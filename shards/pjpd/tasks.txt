@@ -1,0 +1,13 @@
+Priority:   40
+Status: ToDo
+ID: deathclips-bkjz
+Created: 2026-11-09T16:55:53Z
+Updated: 2026-11-09T16:55:53Z
+
+shards: build a snapshot-and-replay tool for "death clips", then consider training on them. Still being thought about; don't start without discussing.
+
+Idea: run the hand-built hunter on long rounds (5-minute rounds, where about 32% of ships die), save the full world state some seconds before each death (10 s to test positioning and crowding, 1-2 s to test reflexes), and replay those states as short 15-20 s clips. Ordinary 30 s training rarely reaches the late waves (3-5) where deaths happen (median death about 67 s), and long rounds make generations slow, so clips would make survival visible cheaply.
+
+Steps: (1) add a way to snapshot a Worlds and start a new Worlds from it (state is plain arrays). (2) Harvest clips and use them first as a fast test set for hand-tuning hunter constants. (3) Check whether clip results predict full-round survival on held-out fields (seeds 1000-1299, 2 and 5 minute rounds); if they don't, stop. (4) Only if they do, evolve on clips, starting with the hunter's ~15 constants rather than the raw weights.
+
+Watch out for: mix ordinary fields into training so it doesn't learn to panic or hide; re-harvest deaths from the improved pilot so it can't memorise a fixed set; score clips on staying alive with a little credit for hits; always confirm on full-length held-out rounds.

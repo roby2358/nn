@@ -22,7 +22,7 @@ The battlefield is on the left. On the right are the controls and a live chart:
   2 s.
 - **Shells:** they fly at 450 px/s for 180 px, a quarter of the field. A shell goes off when it touches any live tank or
   reaches full range.
-- **Blast:** every tank within 30 px of the detonation dies outright. That includes teammates and the shooter.
+- **Blast:** every tank within 15 px of the detonation dies outright. That includes teammates and the shooter.
 - **Tanks** block each other and wrecks don't block anything. Shell range is under half the field, so nothing can shoot
   itself around the wrap.
 - A battle lasts 30 s in training. If a team is wiped out, the survivors hold still and keep earning time.
@@ -32,8 +32,25 @@ The battlefield is on the left. On the right are the controls and a live chart:
 - **Inputs (25, all in the tank's own frame and across the wrap):** gun ready, then the four nearest live enemies and
   the four nearest live teammates, each as bearing (sin, cos) and closeness. An absent contact is zeros. The net sees
   positions only: no enemy heading or speed, and no shells.
-- **Net:** 32 tanh hidden units, then left tread, right tread and shoot.
-- **Genome:** 931 weights, evolved without gradients.
+- **Net:** two tanh hidden layers of 48 and 16 units, then left tread, right tread and shoot.
+- **Genome:** 2,083 weights, evolved without gradients.
+
+## The calculated tank
+
+`just cc-calculated <out.npz>` builds a tank with no training and writes it as an ordinary genome in the same
+25 -> 48 -> 16 -> 3 net. It uses 44 of the 48 first-layer units and all 16 of the second-layer units. Write it to
+`weights.npz` with no `swarm.npz` beside it and `just up` puts it in every tank.
+
+- **Charge:** it turns at the nearest enemy and drives in, stopping 30 px short and backing off if the enemy gets closer.
+- **Fire:** it shoots when any of the four visible enemies is in the sights and within reach. It never fires with the
+  nearest enemy inside 25 px, where a hit would catch the shooter too.
+- **Friendly-fire veto:** any visible teammate on the line of fire or by the blast holds the shot, whichever enemy it was
+  aimed at.
+- **Spacing:** on the approach it steers away from teammates inside about 22 px, just outside a blast, and back toward
+  the nearest if it drifts past 30 px. Once an enemy is in range, spacing can only slow a tank with a teammate close ahead.
+
+It doesn't use the gun-ready input, because pulling the trigger while reloading does nothing. Battles are short and
+lethal: against itself, the last tank dies about 8 s in on average. `just cc-mirror` measures that.
 
 ## Fitness
 
@@ -41,7 +58,7 @@ Each net drives one tank. A shell's owner gets the credit for it, even if the ow
 
 | Event | Points |
 | --- | --- |
-| Each second alive | +0.1 |
+| Each second alive | +1 |
 | Enemy killed by your shell | +5 |
 | Teammate (or yourself) killed by your shell | -5 |
 | Near miss: your shell came within 60 px of a live enemy and killed no enemy | +0.5 |
@@ -67,6 +84,8 @@ just up           # launch the GUI, needs a display
 just evolve 300   # evolve headless, resumes from and saves swarm.npz + weights.npz
 just cc-stats swarm.npz 200                  # win rate and rates per tank against random nets
 just cc-video swarm.npz 0 30 tenks.mp4       # record one battle
+just cc-calculated weights.npz               # build the calculated tank without training
+just cc-mirror weights.npz 200               # how a net's battles against itself play out
 ```
 
 Requires `uv` and `just`.

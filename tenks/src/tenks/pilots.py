@@ -6,9 +6,10 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import CMD_SHOOT, N_HIDDEN, N_INPUTS, N_OUTPUTS
+from .config import CMD_SHOOT, N_HIDDEN_1, N_HIDDEN_2, N_INPUTS, N_OUTPUTS
 
-SHAPES = [(N_INPUTS, N_HIDDEN), (N_HIDDEN,), (N_HIDDEN, N_OUTPUTS), (N_OUTPUTS,)]
+SHAPES = [(N_INPUTS, N_HIDDEN_1), (N_HIDDEN_1,), (N_HIDDEN_1, N_HIDDEN_2), (N_HIDDEN_2,),
+          (N_HIDDEN_2, N_OUTPUTS), (N_OUTPUTS,)]
 GENOME = sum(int(np.prod(s)) for s in SHAPES)
 
 
@@ -25,7 +26,7 @@ def random_genomes(rng: np.random.Generator, n: int) -> np.ndarray:
 
 
 class Brains:
-    """A batch of nets, one per tank: inputs -> tanh hidden -> treads in -1..1 and shoot in 0..1.
+    """A batch of nets, one per tank: inputs -> two tanh hidden layers -> treads in -1..1 and shoot in 0..1.
     Each row of `genomes` is one flat net, so evolution can treat it as a vector."""
 
     def __init__(self, genomes: np.ndarray) -> None:
@@ -38,9 +39,10 @@ class Brains:
             cut += size
 
     def act(self, obs: np.ndarray) -> np.ndarray:
-        W1, b1, W2, b2 = self.layers
-        h = np.tanh(np.matmul(obs[:, None, :], W1)[:, 0] + b1)
-        out = np.tanh(np.matmul(h[:, None, :], W2)[:, 0] + b2)
+        W1, b1, W2, b2, W3, b3 = self.layers
+        h1 = np.tanh(np.matmul(obs[:, None, :], W1)[:, 0] + b1)
+        h2 = np.tanh(np.matmul(h1[:, None, :], W2)[:, 0] + b2)
+        out = np.tanh(np.matmul(h2[:, None, :], W3)[:, 0] + b3)
         out[:, CMD_SHOOT] = (out[:, CMD_SHOOT] + 1.0) / 2.0
         return out
 

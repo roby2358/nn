@@ -65,14 +65,28 @@ def test_save_and_load_round_trip(tmp_path):
     assert a.history == b.history
 
 
-def test_a_weights_file_alone_takes_the_top_spot_of_a_random_swarm(tmp_path):
+def test_a_weights_file_alone_fills_every_seat_with_the_leader(tmp_path):
     weights = tmp_path / "weights.npz"
     champion = random_genomes(np.random.default_rng(8), 1)[0]
     save_champion(weights, champion)
     ev = Evolver(9)
     report = ev.load(tmp_path / "missing.npz", weights)
-    assert np.array_equal(ev.genomes[0], champion)
+    assert np.array_equal(ev.genomes, np.tile(champion, (POP_SIZE, 1)))
+    assert np.array_equal(ev.leaders(), np.tile(champion, (TANKS, 1)))
     assert (not report.swarm_found, report.leader_found, ev.gen) == (True, True, 0)
+
+
+def test_a_weights_file_with_a_swarm_takes_only_the_top_spot(tmp_path):
+    swarm, weights = tmp_path / "swarm.npz", tmp_path / "weights.npz"
+    a = Evolver(3)
+    a.step()
+    a.save(swarm, weights)
+    champion = random_genomes(np.random.default_rng(8), 1)[0]
+    save_champion(weights, champion)
+    b = Evolver(4)
+    b.load(swarm, weights)
+    assert np.array_equal(b.genomes[0], champion)
+    assert np.array_equal(b.genomes[1:], a.genomes[1:])
 
 
 def test_a_generation_under_way_when_the_population_is_replaced_is_dropped(monkeypatch):

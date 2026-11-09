@@ -10,6 +10,9 @@ description: Project helper recipes for tenks (cc- prefixed justfile recipes). U
   measure progress on their own.
 - `just cc-stats <file.npz> <n>`: the file's nets take green against fresh random blue nets on battles seeded 0..n-1.
   Prints win rates and per-tank kills, friendly kills, near misses and shots. Use the same n to compare two files.
+- `just cc-calculated <out.npz>`: writes the hand-built charging tank (`src/tenks/calculated.py`) as a weights file.
+- `just cc-mirror <file.npz> <n>`: the file's nets fight themselves on battles seeded 0..n-1. Prints how decisive and how
+  long the battles are, plus per-tank rates. Use it to judge how a net will look on video.
 - `just cc-video <file.npz> <seed> <seconds> <out.mp4>`: records one battle at real speed. A swarm file seats its first
   16 nets (8 elites and 8 children) in a shuffled order; a weights file seats its one champion in all 16 tanks.
 - `just cc-shot <seconds> <dir>`: writes `shot-watch.png` and `shot-drive.png` of the whole GUI window, headless, for

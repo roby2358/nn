@@ -86,6 +86,8 @@ class LoadReport:
     gen: int
 
     def describe(self) -> str:
+        if self.leader_found and not self.swarm_found:
+            return f"No {SWARM}, so every tank gets the leader from {WEIGHTS}."
         swarm = f"swarm at generation {self.gen}" if self.swarm_found else f"no {SWARM}, so a random swarm"
         leader = f"leader from {WEIGHTS}" if self.leader_found else f"no {WEIGHTS}, so the swarm's own leader"
         return f"Loaded {swarm}; {leader}."
@@ -135,15 +137,23 @@ class Evolver:
         save_champion(weights, genomes[0])
 
     def load(self, swarm: Path, weights: Path) -> LoadReport:
-        """The swarm from `swarm` (random, with no history, if it's missing), then the leader
-        from `weights` written over the top spot (left alone if that file is missing)."""
-        genomes, history = self._read_swarm(swarm) if swarm.exists() else (random_genomes(self.rng, POP_SIZE), [])
-        if weights.exists():
-            genomes[0] = load_roster(weights)[0]
+        """Replace the population with what these files hold; see _starting_population."""
+        genomes, history = self._starting_population(swarm, weights)
         with self.lock:
             self.genomes = genomes
             self.history = history
         return LoadReport(swarm.exists(), weights.exists(), len(history))
+
+    def _starting_population(self, swarm: Path, weights: Path) -> tuple[np.ndarray, list[GenStats]]:
+        """With a swarm, the swarm and its history, the `weights` leader (if any) on the top spot.
+        With only a leader, the whole population is that leader. With neither, a random population."""
+        if not swarm.exists():
+            genomes = seat(load_roster(weights), POP_SIZE) if weights.exists() else random_genomes(self.rng, POP_SIZE)
+            return genomes, []
+        genomes, history = self._read_swarm(swarm)
+        if weights.exists():
+            genomes[0] = load_roster(weights)[0]
+        return genomes, history
 
     def _read_swarm(self, path: Path) -> tuple[np.ndarray, list[GenStats]]:
         genomes = load_roster(path)

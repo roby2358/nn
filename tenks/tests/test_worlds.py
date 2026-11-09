@@ -83,13 +83,13 @@ def test_tanks_wrap_at_the_edge():
 
 
 def test_tanks_block_each_other():
-    w = arena({GREEN_A: (300.0, 300.0, 0.0), BLUE_A: (312.0, 300.0, 0.0)})
+    w = arena({GREEN_A: (300.0, 300.0, 0.0), BLUE_A: (300.0 + 2.0 * TANK_R - 3.0, 300.0, 0.0)})
     w.step(orders())
     assert length(shortest(w.pos[0, BLUE_A] - w.pos[0, GREEN_A])) == pytest.approx(2.0 * TANK_R)
 
 
 def test_dead_tanks_do_not_block():
-    w = arena({GREEN_A: (300.0, 300.0, 0.0), BLUE_A: (312.0, 300.0, 0.0)})
+    w = arena({GREEN_A: (300.0, 300.0, 0.0), BLUE_A: (300.0 + 2.0 * TANK_R - 3.0, 300.0, 0.0)})
     w.alive[0, BLUE_A] = False
     w.step(orders())
     assert w.pos[0, GREEN_A] == pytest.approx([300.0, 300.0])
@@ -124,7 +124,7 @@ def test_splash_kills_every_tank_in_the_radius_and_spares_those_outside():
 
 
 def test_a_shell_goes_off_at_full_range():
-    w = arena({GREEN_A: (100.0, 300.0, 0.0), BLUE_A: (100.0 + TANK_R + SHELL_RANGE + 20.0, 300.0 + 12.0, 0.0)})
+    w = arena({GREEN_A: (100.0, 300.0, 0.0), BLUE_A: (100.0 + TANK_R + SHELL_RANGE + 7.0, 300.0 + TANK_R + 2.0, 0.0)})
     fire_once(w, GREEN_A, 0.5)
     assert not w.alive[0, BLUE_A]     # never touched, but inside the blast where the shell ran out
 
@@ -137,7 +137,7 @@ def test_splash_kills_teammates_and_costs_the_shooter():
 
 
 def test_point_blank_splash_kills_the_shooter_too():
-    w = arena({GREEN_A: (100.0, 300.0, 0.0), BLUE_A: (120.5, 300.0, 0.0)})
+    w = arena({GREEN_A: (100.0, 300.0, 0.0), BLUE_A: (100.0 + 2.0 * TANK_R + 0.5, 300.0, 0.0)})
     fire_once(w, GREEN_A, 0.1)
     assert not w.alive[0, GREEN_A] and not w.alive[0, BLUE_A]
     assert (w.kills[0, GREEN_A], w.friendly_kills[0, GREEN_A]) == (1, 1)

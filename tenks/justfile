@@ -36,6 +36,14 @@ clean:
 cc-stats weights n:
     {{python}} -m tenks.stats {{weights}} {{n}}
 
+# Build the calculated charging tank, with no training
+cc-calculated out:
+    {{python}} -m tenks.calculated {{out}}
+
+# Play a swarm or weights file against itself on N fixed battles
+cc-mirror weights n:
+    {{python}} -m tenks.mirror {{weights}} {{n}}
+
 # Save headless screenshots of the whole window into a directory, N seconds into a battle
 cc-shot seconds dir:
     {{python}} -m tenks.shot {{seconds}} {{dir}}

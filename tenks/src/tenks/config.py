@@ -23,9 +23,9 @@ SPAWN_HALF_BAND = 90.0    # each team starts within this of its own vertical lin
 SPAWN_GAP = 40.0          # least distance between two tanks of a team at the start
 
 # ---- tanks: speed follows the treads directly, with no momentum --------------------
-MAX_SPEED = 70.0          # px/s with both treads full forward
+MAX_SPEED = 35.0          # px/s with both treads full forward
 TURN_RATE = 2.2           # rad/s with the treads full and opposite
-TANK_R = 10.0
+TANK_R = 5.0
 
 # ---- gun: fixed to the hull, one shell in flight per tank --------------------------
 RELOAD = 2.0              # seconds between shots
@@ -34,11 +34,11 @@ SHELL_SPEED = 450.0
 SHELL_RANGE = FIELD_W / 4
 SHELL_LIFE = SHELL_RANGE / SHELL_SPEED
 MUZZLE_GAP = 2.0          # a new shell starts this far outside its own hull
-SPLASH_R = 30.0           # every tank this close to a detonation dies
+SPLASH_R = 15.0           # every tank this close to a detonation dies
 NEAR_MISS_R = 60.0        # a shell that came this close to an enemy and killed none is a near miss
 
 # ---- scoring, per tank ------------------------------------------------------------
-SURVIVAL_POINTS = 0.1     # per second alive
+SURVIVAL_POINTS = 1.0     # per second alive
 KILL_POINTS = 5.0         # per enemy your shell kills
 FRIENDLY_KILL_COST = 5.0  # per tank of your own team your shell kills, yourself included
 NEAR_MISS_POINTS = 0.5    # per near miss
@@ -52,7 +52,8 @@ N_INPUTS = SELF_INPUTS + 2 * NEAREST * CONTACT_INPUTS
 SENSE_RANGE = FIELD_W / 2
 
 # ---- net: left tread -1..1, right tread -1..1, shoot 0..1 --------------------------
-N_HIDDEN = 32
+N_HIDDEN_1 = 48
+N_HIDDEN_2 = 16
 N_OUTPUTS = 3
 CMD_LEFT, CMD_RIGHT, CMD_SHOOT = range(N_OUTPUTS)
 
